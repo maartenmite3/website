@@ -1,109 +1,116 @@
 export async function onRequestGet(context) {
-  if (!context.data.user) return new Response('Unauthorized', { status: 401 });
-  
-  const url = new URL(context.request.url);
-  const assetId = url.searchParams.get('id');
-  const type = url.searchParams.get('type');
+    const url = new URL(context.request.url);
+    const id = url.searchParams.get('id');
+    const type = url.searchParams.get('type');
 
-  // 1. LIJST VOOR DROPDOWN
-  if (type === 'list') {
-      const { results } = await context.env.MY_DB.prepare("SELECT id, name FROM assets ORDER BY name ASC").all();
-      return Response.json(results);
-  }
+    if (type === 'list') {
+        const { results } = await context.env.MY_DB.prepare("SELECT id, name FROM assets ORDER BY name ASC").all();
+        return Response.json(results);
+    }
 
-  if (!assetId) return new Response('Missing ID', { status: 400 });
+    if (!id) return new Response('Missing ID', { status: 400 });
 
-  try {
-      const key = context.env.ENCRYPTION_KEY;
+    // Haal basis asset data
+    const asset = await context.env.MY_DB.prepare("SELECT * FROM assets WHERE id = ?").bind(id).first();
+    if (!asset) return new Response('Not found', { status: 404 });
 
-      // 2. DETAILS
-      const vulns = await context.env.MY_DB.prepare("SELECT * FROM vulnerabilities WHERE asset_id = ?").bind(assetId).all();
-      const cis = await context.env.MY_DB.prepare("SELECT * FROM cis_exceptions WHERE asset_id = ?").bind(assetId).all();
-      const history = await context.env.MY_DB.prepare("SELECT * FROM asset_history WHERE asset_id = ? ORDER BY timestamp DESC").bind(assetId).all();
-      
-      // 3. LAYOUT POSITIES
-      const layout = await context.env.MY_DB.prepare("SELECT positions FROM network_layouts WHERE asset_id = ?").bind(assetId).first();
+    // Haal Risk Data (NIEUW)
+    const risk = await context.env.MY_DB.prepare("SELECT * FROM asset_risks WHERE asset_id = ?").bind(id).first();
 
-      // 4. RELATIES OPHALEN (Met Subscriptie ID voor Threat Modeling!)
-      // We moeten de subscription_id decrypten in JS, dus we halen hem encrypted op uit DB
-      
-      // Downstream
-      const childrenQuery = await context.env.MY_DB.prepare(`
-        SELECT r.id, r.relation_type, a.name, a.id as linked_asset_id, a.subscription_id as enc_sub_id, a.type
-        FROM asset_relationships r 
-        JOIN assets a ON r.child_id = a.id 
-        WHERE r.parent_id = ?
-      `).bind(assetId).all();
+    // Haal sub-data (Vulns, CIS, History, Relaties)
+    const vulns = await context.env.MY_DB.prepare("SELECT * FROM vulnerabilities WHERE asset_id = ?").bind(id).all();
+    const cis = await context.env.MY_DB.prepare("SELECT * FROM cis_exceptions WHERE asset_id = ?").bind(id).all();
+    const history = await context.env.MY_DB.prepare("SELECT * FROM asset_history WHERE asset_id = ? ORDER BY timestamp DESC LIMIT 20").bind(id).all();
+    
+    const relDown = await context.env.MY_DB.prepare(`
+        SELECT r.id, r.relation_type, a.name, a.type, a.subscription_id as enc_sub_id, r.child_id as linked_asset_id 
+        FROM asset_relationships r JOIN assets a ON r.child_id = a.id WHERE r.parent_id = ?
+    `).bind(id).all();
+    
+    const relUp = await context.env.MY_DB.prepare(`
+        SELECT r.id, r.relation_type, a.name, a.type, a.subscription_id as enc_sub_id, r.parent_id as linked_asset_id 
+        FROM asset_relationships r JOIN assets a ON r.parent_id = a.id WHERE r.child_id = ?
+    `).bind(id).all();
 
-      // Upstream
-      const parentsQuery = await context.env.MY_DB.prepare(`
-        SELECT r.id, r.relation_type, a.name, a.id as linked_asset_id, a.subscription_id as enc_sub_id, a.type
-        FROM asset_relationships r 
-        JOIN assets a ON r.parent_id = a.id 
-        WHERE r.child_id = ?
-      `).bind(assetId).all();
+    const layout = await context.env.MY_DB.prepare("SELECT positions FROM network_layouts WHERE asset_id = ?").bind(id).first();
 
-      // Helper decrypt functie binnen scope
-      const decrypt = (txt) => {
-          if(!txt || !txt.includes(':')) return txt;
-          try {
-            // ... (Hier herbruiken we node logic niet direct makkelijk zonder import, 
-            // maar voor simple display sturen we de raw encrypted tekst of we doen de decryptie in assets.js logic. 
-            // ECHTER: Om Zero Trust te checken hebben we de tekst nodig.
-            // Oplossing: We doen de check in de Frontend op basis van gelijkheid van strings (encrypted A == encrypted A),
-            // OF we decrypten hier als we de import hebben.
-            // Laten we ervan uitgaan dat de strings uniek zijn, dus vergelijken werkt ook versleuteld.)
-            return txt; 
-          } catch(e) { return txt; }
-      };
-
-      return Response.json({
-          vulnerabilities: vulns.results || [],
-          cis: cis.results || [],
-          history: history.results || [],
-          layout: layout ? JSON.parse(layout.positions) : null,
-          relationships: {
-              downstream: childrenQuery.results || [],
-              upstream: parentsQuery.results || []
-          }
-      });
-  } catch (err) {
-      return new Response('Server Error: ' + err.message, { status: 500 });
-  }
+    return Response.json({
+        asset,
+        risk: risk || { impact: 0, likelihood: 0, justification: '' }, // Standaard leeg object
+        vulnerabilities: vulns.results,
+        cis: cis.results,
+        history: history.results,
+        relationships: { downstream: relDown.results, upstream: relUp.results },
+        layout: layout ? JSON.parse(layout.positions) : null
+    });
 }
 
 export async function onRequestPost(context) {
-  if (!context.data.user) return new Response('Unauthorized', { status: 401 });
-  const data = await context.request.json();
+    if (!context.data.user) return new Response('Unauthorized', { status: 401 });
+    const data = await context.request.json();
+    
+    // --- NIEUW: RISK SAVE ---
+    if (data.type === 'risk') {
+        const { asset_id, impact, likelihood, justification } = data;
+        
+        // Upsert (Insert of Update als bestaat)
+        await context.env.MY_DB.prepare(`
+            INSERT INTO asset_risks (asset_id, impact, likelihood, justification, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(asset_id) DO UPDATE SET
+            impact=excluded.impact,
+            likelihood=excluded.likelihood,
+            justification=excluded.justification,
+            updated_at=excluded.updated_at
+        `).bind(asset_id, impact, likelihood, justification, Date.now()).run();
 
-  if (data.type === 'vuln') {
-      await context.env.MY_DB.prepare("INSERT INTO vulnerabilities (asset_id, name, severity, status, due_date) VALUES (?, ?, ?, ?, ?)").bind(data.asset_id, data.name, data.severity, data.status, data.due_date).run();
-  } 
-  else if (data.type === 'cis') {
-      await context.env.MY_DB.prepare("INSERT INTO cis_exceptions (asset_id, control_id, description, justification) VALUES (?, ?, ?, ?)").bind(data.asset_id, data.control_id, data.description, data.justification).run();
-  }
-  else if (data.type === 'rel') {
-      const exists = await context.env.MY_DB.prepare("SELECT id FROM asset_relationships WHERE parent_id=? AND child_id=?").bind(data.parent_id, data.child_id).first();
-      if(!exists) {
-          await context.env.MY_DB.prepare("INSERT INTO asset_relationships (parent_id, child_id, relation_type) VALUES (?, ?, ?)").bind(data.parent_id, data.child_id, data.relation_type).run();
-      }
-  }
-  else if (data.type === 'layout') {
-      // NIEUW: Layout Opslaan
-      // Upsert (Insert or Replace)
-      await context.env.MY_DB.prepare("INSERT OR REPLACE INTO network_layouts (asset_id, positions) VALUES (?, ?)").bind(data.asset_id, JSON.stringify(data.positions)).run();
-  }
+        // Log history
+        await logHistory(context, asset_id, 'RISK_UPDATE', 'Risk Matrix Updated');
+        return new Response('Risk Saved');
+    }
 
-  return new Response('Added', { status: 201 });
+    // Bestaande logica voor relaties, vulns, cis...
+    if (data.type === 'rel') {
+        await context.env.MY_DB.prepare("INSERT INTO asset_relationships (parent_id, child_id, relation_type) VALUES (?, ?, ?)").bind(data.parent_id, data.child_id, data.relation_type).run();
+        await logHistory(context, data.parent_id, 'LINK', `Linked to ${data.child_id}`);
+    } 
+    else if (data.type === 'layout') {
+        await context.env.MY_DB.prepare("INSERT INTO network_layouts (asset_id, positions) VALUES (?, ?) ON CONFLICT(asset_id) DO UPDATE SET positions=excluded.positions").bind(data.asset_id, JSON.stringify(data.positions)).run();
+    }
+    else if (data.type === 'vuln') {
+        await context.env.MY_DB.prepare("INSERT INTO vulnerabilities (asset_id, name, severity, status, due_date) VALUES (?, ?, ?, ?, ?)").bind(data.asset_id, data.name, data.severity, data.status, data.due_date).run();
+        // Update counter cache
+        await updateVulnCount(context, data.asset_id);
+    }
+    else if (data.type === 'cis') {
+        await context.env.MY_DB.prepare("INSERT INTO cis_exceptions (asset_id, control_id, description, justification) VALUES (?, ?, ?, ?)").bind(data.asset_id, data.control_id, data.description, data.justification).run();
+    }
+
+    return new Response('OK');
 }
 
 export async function onRequestDelete(context) {
     if (!context.data.user) return new Response('Unauthorized', { status: 401 });
     const data = await context.request.json();
     
-    if (data.type === 'vuln') await context.env.MY_DB.prepare("DELETE FROM vulnerabilities WHERE id = ?").bind(data.id).run();
-    else if (data.type === 'cis') await context.env.MY_DB.prepare("DELETE FROM cis_exceptions WHERE id = ?").bind(data.id).run();
-    else if (data.type === 'rel') await context.env.MY_DB.prepare("DELETE FROM asset_relationships WHERE id = ?").bind(data.id).run();
-    
+    if(data.type === 'rel') {
+        await context.env.MY_DB.prepare("DELETE FROM asset_relationships WHERE id = ?").bind(data.id).run();
+    } else if (data.type === 'vuln') {
+        const assetId = await context.env.MY_DB.prepare("SELECT asset_id FROM vulnerabilities WHERE id = ?").bind(data.id).first();
+        await context.env.MY_DB.prepare("DELETE FROM vulnerabilities WHERE id = ?").bind(data.id).run();
+        if(assetId) await updateVulnCount(context, assetId.asset_id);
+    } else if (data.type === 'cis') {
+        await context.env.MY_DB.prepare("DELETE FROM cis_exceptions WHERE id = ?").bind(data.id).run();
+    }
     return new Response('Deleted');
+}
+
+async function updateVulnCount(context, assetId) {
+    const count = await context.env.MY_DB.prepare("SELECT COUNT(*) as c FROM vulnerabilities WHERE asset_id = ? AND severity IN ('Critical', 'High')").bind(assetId).first();
+    await context.env.MY_DB.prepare("UPDATE assets SET vuln_count = ? WHERE id = ?").bind(count.c, assetId).run();
+}
+
+async function logHistory(context, assetId, type, details) {
+    const user = context.data.user.username;
+    await context.env.MY_DB.prepare("INSERT INTO asset_history (asset_id, changed_by, change_type, new_values, timestamp) VALUES (?, ?, ?, ?, ?)").bind(assetId, user, type, details, Date.now()).run();
 }

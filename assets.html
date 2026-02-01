@@ -9,28 +9,62 @@
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     
     <style>
+        /* Status Kleuren */
         .confidential { border-left: 5px solid #dc3545; background-color: #fffbfb; }
         .internal { border-left: 5px solid #ffc107; }
         .public { border-left: 5px solid #198754; }
+        
+        /* Privacy Masker */
         .masked-data { filter: blur(5px); cursor: pointer; transition: 0.2s; user-select: none; display: inline-block; }
         .masked-data:hover, .masked-data.revealed { filter: none; }
+        
+        /* Links & Interactie */
         .clickable-asset { cursor: pointer; color: #0d6efd; font-weight: bold; text-decoration: underline; }
+        .cursor-pointer { cursor: pointer; }
+        
+        /* Netwerk Container */
         #networkGraph { width: 100%; height: 600px; border: 1px solid #ddd; background-color: #f8f9fa; }
         .asset-icon-img { width: 24px; height: 24px; vertical-align: middle; margin-right: 10px; }
+        
+        /* Paginering */
         .pagination { margin-top: 1rem; margin-bottom: 2rem; }
-        .cursor-pointer { cursor: pointer; }
+
+        /* RISK MATRIX STYLES (NIEUW) */
+        .risk-matrix { display: grid; grid-template-columns: auto repeat(4, 1fr); gap: 2px; background: #fff; max-width: 400px; margin: 0 auto; }
+        .risk-header { font-weight: bold; text-align: center; padding: 5px; font-size: 0.8rem; display: flex; align-items: center; justify-content: center;}
+        .risk-label-y { writing-mode: vertical-rl; transform: rotate(180deg); text-align: center; font-weight: bold; }
+        .risk-cell { 
+            height: 50px; border: 1px solid #ddd; cursor: pointer; transition: 0.2s; position: relative;
+        }
+        .risk-cell:hover { transform: scale(1.05); z-index: 10; border: 2px solid #333; }
+        .risk-cell.selected::after {
+            content: '✖'; font-size: 24px; color: #fff; position: absolute; 
+            top: 50%; left: 50%; transform: translate(-50%, -50%); text-shadow: 0 0 3px #000;
+        }
+        /* Matrix Kleuren */
+        .risk-low { background-color: #198754; opacity: 0.6; } /* Groen */
+        .risk-med { background-color: #ffc107; opacity: 0.6; } /* Geel */
+        .risk-high { background-color: #fd7e14; opacity: 0.7; } /* Oranje */
+        .risk-crit { background-color: #dc3545; opacity: 0.8; } /* Rood */
     </style>
 </head>
 <body class="bg-light">
 
-    <nav class="navbar navbar-dark bg-dark mb-4">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
         <div class="container">
             <span class="navbar-brand"><i class="bi bi-shield-shaded"></i> Asset Inventory</span>
             <div class="d-flex gap-3 align-items-center">
-                <a href="/subscriptions.html" class="btn btn-outline-info btn-sm" data-i18n="btn_manage_subs">Beheer Subscripties</a>
+                <a href="/subscriptions.html" class="nav-link text-white" data-i18n="nav_subs">Subscripties</a>
+                <a href="/audit.html" class="nav-link text-white" data-i18n="nav_audit">Audit Log</a>
+                <a href="/quality.html" class="nav-link text-white" data-i18n="nav_quality">Datakwaliteit</a>
+                <a href="/trends.html" class="nav-link text-white" data-i18n="nav_trends">Trends</a>
+                <a href="/reports.html" class="nav-link text-white" data-i18n="nav_reports">Rapportages</a>
                 <a href="/" class="btn btn-outline-light btn-sm" data-i18n="btn_dashboard">Dashboard</a>
+                
                 <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-translate"></i> <span id="currentLang">NL</span></button>
+                    <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-translate"></i> <span id="currentLang">NL</span>
+                    </button>
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><a class="dropdown-item cursor-pointer" onclick="setLanguage('nl')">🇳🇱 Nederlands</a></li>
                         <li><a class="dropdown-item cursor-pointer" onclick="setLanguage('en')">🇬🇧 English</a></li>
@@ -139,7 +173,6 @@
                 </div>
                 <div class="modal-body">
                     <p id="bulkCountMsg">Je staat op het punt om X items te bewerken.</p>
-                    
                     <div class="mb-3">
                         <label class="form-label" data-i18n="lbl_field">Kies een veld</label>
                         <select id="bulkField" class="form-select" onchange="updateBulkInput()">
@@ -149,12 +182,9 @@
                             <option value="type">Type</option>
                         </select>
                     </div>
-
                     <div class="mb-3">
                         <label class="form-label" data-i18n="lbl_value">Nieuwe Waarde</label>
-                        <div id="bulkValueContainer">
-                            <input type="text" id="bulkValue" class="form-control">
-                        </div>
+                        <div id="bulkValueContainer"><input type="text" id="bulkValue" class="form-control"></div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -171,36 +201,72 @@
                 <div class="modal-header"><h5 class="modal-title" id="detailTitle">Details</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body p-0">
                     <ul class="nav nav-tabs nav-fill bg-light" role="tablist">
-                        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabVuln" data-i18n="tab_vuln">🛑 Kwetsbaarheden</a></li>
+                        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabRisk">⚠️ Risico Matrix</a></li>
+                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabVuln" data-i18n="tab_vuln">🛑 Kwetsbaarheden</a></li>
                         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabCis" data-i18n="tab_cis">✅ CIS</a></li>
                         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabRel" data-i18n="tab_rel">🔗 Relaties</a></li>
                         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabHist" data-i18n="tab_hist">🕒 Geschiedenis</a></li>
                     </ul>
+                    
                     <div class="tab-content p-3">
-                        <div class="tab-pane fade show active" id="tabVuln">
-                            <table class="table table-sm table-striped"><thead><tr><th data-i18n="th_name">Naam</th><th>Severity</th><th>Status</th><th data-i18n="th_date">Datum</th><th></th></tr></thead><tbody id="vulnTable"></tbody></table>
-                            <div class="text-end mt-2"><button class="btn btn-sm btn-outline-success" onclick="toggleForm('vulnForm')">+</button></div>
-                            <form id="vulnForm" class="row g-2 mt-2 p-2 border rounded d-none">
-                                <div class="col-md-3"><input type="text" id="vName" class="form-control form-control-sm" placeholder="Naam"></div>
+                        
+                        <div class="tab-pane fade show active" id="tabRisk">
+                            <div class="row">
+                                <div class="col-md-6 border-end">
+                                    <h6 class="text-center mb-3">Impact vs Waarschijnlijkheid</h6>
+                                    <div class="d-flex justify-content-center align-items-center mb-2">
+                                        <div class="risk-label-y me-2">IMPACT</div>
+                                        <div>
+                                            <div class="risk-matrix">
+                                                <div></div><div class="risk-header">Low</div><div class="risk-header">Med</div><div class="risk-header">High</div><div class="risk-header">Crit</div>
+                                                <div class="risk-header" style="writing-mode: horizontal-tb; transform: none;">Crit</div>
+                                                <div class="risk-cell risk-med" onclick="setRisk(4,1)" id="r_4_1" title="Impact: Crit, Prob: Low"></div><div class="risk-cell risk-high" onclick="setRisk(4,2)" id="r_4_2" title="Impact: Crit, Prob: Med"></div><div class="risk-cell risk-crit" onclick="setRisk(4,3)" id="r_4_3" title="Impact: Crit, Prob: High"></div><div class="risk-cell risk-crit" onclick="setRisk(4,4)" id="r_4_4" title="Impact: Crit, Prob: Crit"></div>
+                                                <div class="risk-header" style="writing-mode: horizontal-tb; transform: none;">High</div>
+                                                <div class="risk-cell risk-med" onclick="setRisk(3,1)" id="r_3_1"></div><div class="risk-cell risk-med" onclick="setRisk(3,2)" id="r_3_2"></div><div class="risk-cell risk-high" onclick="setRisk(3,3)" id="r_3_3"></div><div class="risk-cell risk-crit" onclick="setRisk(3,4)" id="r_3_4"></div>
+                                                <div class="risk-header" style="writing-mode: horizontal-tb; transform: none;">Med</div>
+                                                <div class="risk-cell risk-low" onclick="setRisk(2,1)" id="r_2_1"></div><div class="risk-cell risk-med" onclick="setRisk(2,2)" id="r_2_2"></div><div class="risk-cell risk-med" onclick="setRisk(2,3)" id="r_2_3"></div><div class="risk-cell risk-high" onclick="setRisk(2,4)" id="r_2_4"></div>
+                                                <div class="risk-header" style="writing-mode: horizontal-tb; transform: none;">Low</div>
+                                                <div class="risk-cell risk-low" onclick="setRisk(1,1)" id="r_1_1"></div><div class="risk-cell risk-low" onclick="setRisk(1,2)" id="r_1_2"></div><div class="risk-cell risk-med" onclick="setRisk(1,3)" id="r_1_3"></div><div class="risk-cell risk-med" onclick="setRisk(1,4)" id="r_1_4"></div>
+                                            </div>
+                                            <div class="text-center mt-2 small fw-bold">WAARSCHIJNLIJKHEID (Likelihood)</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6 class="mb-3">Onderbouwing</h6>
+                                    <form id="riskForm">
+                                        <input type="hidden" id="riskImp"><input type="hidden" id="riskLik">
+                                        <div class="mb-3"><label class="form-label small text-muted">Waarom is dit risico zo ingeschat?</label><textarea id="riskJust" class="form-control" rows="8" placeholder="Beschrijf business impact..."></textarea></div>
+                                        <div class="d-flex justify-content-between align-items-center"><div id="riskScoreDisplay" class="fw-bold text-muted">Score: -</div><button type="button" class="btn btn-success" onclick="saveRisk()">Opslaan</button></div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade" id="tabVuln">
+                            <form id="vulnForm" class="row g-2 mb-3 bg-light p-2 border rounded">
+                                <div class="col-md-3"><input type="text" id="vName" class="form-control form-control-sm" placeholder="Kwetsbaarheid"></div>
                                 <div class="col-md-2"><select id="vSev" class="form-select form-select-sm"><option>Critical</option><option>High</option><option>Medium</option></select></div>
                                 <div class="col-md-3"><select id="vStat" class="form-select form-select-sm"><option>Open</option><option>Tijdelijke Uitzondering</option></select></div>
                                 <div class="col-md-2"><input type="date" id="vDate" class="form-control form-control-sm"></div>
                                 <div class="col-md-2"><button type="button" onclick="addVuln()" class="btn btn-sm btn-success w-100" data-i18n="btn_add">Toevoegen</button></div>
                             </form>
+                            <table class="table table-sm table-striped"><thead><tr><th data-i18n="th_name">Naam</th><th>Severity</th><th>Status</th><th data-i18n="th_date">Datum</th><th></th></tr></thead><tbody id="vulnTable"></tbody></table>
                         </div>
+
                         <div class="tab-pane fade" id="tabCis">
-                            <table class="table table-sm table-striped"><thead><tr><th>ID</th><th data-i18n="th_desc">Beschrijving</th><th data-i18n="th_reason">Reden</th><th></th></tr></thead><tbody id="cisTable"></tbody></table>
-                            <div class="text-end mt-2"><button class="btn btn-sm btn-outline-success" onclick="toggleForm('cisForm')">+</button></div>
-                            <form id="cisForm" class="row g-2 mt-2 p-2 border rounded d-none">
+                            <form id="cisForm" class="row g-2 mb-3 bg-light p-2 border rounded">
                                 <div class="col-md-2"><input type="text" id="cId" class="form-control form-control-sm" placeholder="ID"></div>
                                 <div class="col-md-5"><input type="text" id="cDesc" class="form-control form-control-sm" placeholder="Beschrijving"></div>
                                 <div class="col-md-3"><input type="text" id="cJust" class="form-control form-control-sm" placeholder="Reden"></div>
                                 <div class="col-md-2"><button type="button" onclick="addCis()" class="btn btn-sm btn-success w-100" data-i18n="btn_add">Toevoegen</button></div>
                             </form>
+                            <table class="table table-sm table-striped"><thead><tr><th>ID</th><th data-i18n="th_desc">Beschrijving</th><th data-i18n="th_reason">Reden</th><th></th></tr></thead><tbody id="cisTable"></tbody></table>
                         </div>
+
                         <div class="tab-pane fade" id="tabRel">
                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                <div class="alert alert-info py-2 small mb-0 flex-grow-1 me-3" data-i18n="rel_info">Koppel assets om afhankelijkheden in kaart te brengen.</div>
+                                <div class="alert alert-info py-2 small mb-0 flex-grow-1 me-3" data-i18n="rel_info">Koppel assets.</div>
                                 <button class="btn btn-primary shadow-sm" onclick="openNetworkModal()"><i class="bi bi-diagram-3-fill"></i> <span data-i18n="btn_show_network">Toon Netwerk</span></button>
                             </div>
                             <form id="relForm" class="row g-2 mb-3 bg-light p-2 border rounded align-items-center">
@@ -212,6 +278,7 @@
                             <h6 data-i18n="hdr_downstream">Afhankelijkheden</h6><table class="table table-sm table-bordered mb-3"><tbody id="relDownTable"></tbody></table>
                             <h6 data-i18n="hdr_upstream">Gebruikt door</h6><table class="table table-sm table-bordered"><tbody id="relUpTable"></tbody></table>
                         </div>
+                        
                         <div class="tab-pane fade" id="tabHist"><table class="table table-sm text-muted small"><thead><tr><th data-i18n="th_time">Tijd</th><th data-i18n="th_who">Wie</th><th>Type</th></tr></thead><tbody id="histTable"></tbody></table></div>
                     </div>
                 </div>
@@ -263,13 +330,14 @@
         // --- TRANSLATIONS & DATA MAPPING ---
         const translations = {
             nl: {
-                btn_manage_subs: "Beheer Subscripties", btn_dashboard: "Dashboard", btn_new_asset: "Nieuwe Asset", btn_import: "Import", btn_export: "Export", opt_all: "Alles", btn_bulk_edit: "Bulk Bewerken",
+                nav_subs: "Subscripties", nav_audit: "Audit Log", nav_quality: "Datakwaliteit", nav_trends: "Trends", nav_reports: "Rapportages", btn_dashboard: "Dashboard",
+                btn_new_asset: "Nieuwe Asset", btn_import: "Import", btn_export: "Export", opt_all: "Alles", btn_bulk_edit: "Bulk Bewerken",
                 th_asset: "Asset", th_ips: "IPs", th_sub: "Subscriptie", th_owner: "Eigenaar", th_labels: "Labels", th_vulns: "Vulns", th_class: "Class", th_action: "Actie", loading: "Laden...",
                 lbl_name: "Naam", lbl_sub: "Subscriptie", lbl_owner: "Eigenaar", lbl_ips: "IP Adres(sen)", lbl_class: "Classificatie", lbl_sens: "Data Gevoeligheid",
                 btn_cancel: "Annuleren", btn_save: "Opslaan", btn_update: "Updaten", btn_add: "Toevoegen", btn_link: "Koppelen", btn_show_network: "Toon Netwerk",
                 tab_vuln: "🛑 Kwetsbaarheden", tab_cis: "✅ CIS", tab_rel: "🔗 Relaties", tab_hist: "🕒 Geschiedenis",
                 th_name: "Naam", th_date: "Datum", th_desc: "Beschrijving", th_reason: "Reden", th_time: "Tijd", th_who: "Wie",
-                hdr_downstream: "Afhankelijkheden", hdr_upstream: "Gebruikt door", rel_info: "Koppel assets om afhankelijkheden in kaart te brengen.", lbl_this_asset: "Deze asset...",
+                hdr_downstream: "Afhankelijkheden", hdr_upstream: "Gebruikt door", rel_info: "Koppel assets.", lbl_this_asset: "Deze asset...",
                 modal_network: "Netwerk Overzicht", modal_import: "Importeren", modal_bulk: "Bulk Bewerken", btn_analyze: "Analyseren", tab_new: "Nieuw", btn_start_import: "Start Import",
                 txt_prev: "Vorige", txt_next: "Volgende", txt_no_data: "Geen data", alert_saved: "Opgeslagen", alert_deleted: "Verwijderd", alert_confirm: "Zeker weten?",
                 btn_organize: "Organiseren", btn_stop_organize: "Stop Organiseren", btn_save_layout: "Layout Opslaan", btn_photo: "Foto",
@@ -277,13 +345,14 @@
                 lbl_field: "Kies Veld", lbl_value: "Nieuwe Waarde", txt_bulk_msg: "Je bewerkt {n} items."
             },
             en: {
-                btn_manage_subs: "Manage Subscriptions", btn_dashboard: "Dashboard", btn_new_asset: "New Asset", btn_import: "Import", btn_export: "Export", opt_all: "All", btn_bulk_edit: "Bulk Edit",
+                nav_subs: "Subscriptions", nav_audit: "Audit Log", nav_quality: "Data Quality", nav_trends: "Trends", nav_reports: "Reports", btn_dashboard: "Dashboard",
+                btn_new_asset: "New Asset", btn_import: "Import", btn_export: "Export", opt_all: "All", btn_bulk_edit: "Bulk Edit",
                 th_asset: "Asset", th_ips: "IPs", th_sub: "Subscription", th_owner: "Owner", th_labels: "Labels", th_vulns: "Vulns", th_class: "Class", th_action: "Action", loading: "Loading...",
                 lbl_name: "Name", lbl_sub: "Subscription", lbl_owner: "Owner", lbl_ips: "IP Address(es)", lbl_class: "Classification", lbl_sens: "Data Sensitivity",
                 btn_cancel: "Cancel", btn_save: "Save", btn_update: "Update", btn_add: "Add", btn_link: "Link", btn_show_network: "Show Network",
                 tab_vuln: "🛑 Vulnerabilities", tab_cis: "✅ CIS", tab_rel: "🔗 Relations", tab_hist: "🕒 History",
                 th_name: "Name", th_date: "Date", th_desc: "Description", th_reason: "Reason", th_time: "Time", th_who: "Who",
-                hdr_downstream: "Dependencies", hdr_upstream: "Used by", rel_info: "Link assets to map dependencies.", lbl_this_asset: "This asset...",
+                hdr_downstream: "Dependencies", hdr_upstream: "Used by", rel_info: "Link assets.", lbl_this_asset: "This asset...",
                 modal_network: "Network Overview", modal_import: "Import", modal_bulk: "Bulk Edit", btn_analyze: "Analyze", tab_new: "New", btn_start_import: "Start Import",
                 txt_prev: "Previous", txt_next: "Next", txt_no_data: "No data", alert_saved: "Saved", alert_deleted: "Deleted", alert_confirm: "Are you sure?",
                 btn_organize: "Organize", btn_stop_organize: "Stop Organizing", btn_save_layout: "Save Layout", btn_photo: "Photo",
@@ -297,7 +366,7 @@
             en: { "Draait op":"Runs on", "Verbonden met":"Connected to", "Afhankelijk van":"Depends on", "Virtual Machine":"Virtual Machine", "Network Interface":"Network Interface", "SQL Database":"SQL Database", "Key Vault":"Key Vault", "Private Endpoint":"Private Endpoint" }
         };
 
-        // --- I18N LOGIC ---
+        // --- I18N ---
         function setLanguage(lang) { localStorage.setItem('lang', lang); applyLanguage(); }
         function applyLanguage() {
             const lang = localStorage.getItem('lang') || 'nl';
@@ -315,12 +384,12 @@
         function t(key) { const lang = localStorage.getItem('lang') || 'nl'; return translations[lang][key] || key; }
         function tr(value) { const lang = localStorage.getItem('lang') || 'nl'; return dataTranslations[lang][value] || value; }
 
-        // --- GLOBAL VARS ---
+        // --- VARS ---
         let allAssets = []; let allSubs = []; let currentAssetId = null; let currentRelationships = null; let currentLayout = null;
         let isGlobalRevealed = false; let importData = { new: [] }; let searchTimeout = null; let networkInstance = null;
         let currentPage = 1; let totalPages = 1; let selectedIds = new Set();
 
-        // INIT
+        // --- INIT ---
         applyLanguage();
         loadSubs();
 
@@ -397,6 +466,40 @@
             });
         }
 
+        // --- RISK MATRIX LOGIC ---
+        function renderRiskMatrix(riskData) {
+            document.querySelectorAll('.risk-cell').forEach(c => c.classList.remove('selected'));
+            document.getElementById('riskImp').value = riskData.impact || 0;
+            document.getElementById('riskLik').value = riskData.likelihood || 0;
+            document.getElementById('riskJust').value = riskData.justification || '';
+            if (riskData.impact > 0 && riskData.likelihood > 0) {
+                const cell = document.getElementById(`r_${riskData.impact}_${riskData.likelihood}`);
+                if(cell) cell.classList.add('selected');
+                updateRiskLabel(riskData.impact, riskData.likelihood);
+            } else document.getElementById('riskScoreDisplay').innerText = "Nog niet beoordeeld";
+        }
+        function setRisk(imp, lik) {
+            document.getElementById('riskImp').value = imp;
+            document.getElementById('riskLik').value = lik;
+            document.querySelectorAll('.risk-cell').forEach(c => c.classList.remove('selected'));
+            document.getElementById(`r_${imp}_${lik}`).classList.add('selected');
+            updateRiskLabel(imp, lik);
+        }
+        function updateRiskLabel(imp, lik) {
+            const score = imp * lik;
+            let label = "Low"; if(score >= 4) label="Medium"; if(score >= 9) label="High"; if(score >= 12) label="Critical";
+            document.getElementById('riskScoreDisplay').innerHTML = `Score: <span class="badge bg-secondary">${score}</span> (${label})`;
+        }
+        async function saveRisk() {
+            const imp = document.getElementById('riskImp').value;
+            const lik = document.getElementById('riskLik').value;
+            const just = document.getElementById('riskJust').value;
+            if(!imp || !lik) return alert("Selecteer een vakje.");
+            if(!just) return alert("Vul onderbouwing in.");
+            const res = await fetch('/api/asset-details', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ type:'risk', asset_id:currentAssetId, impact:imp, likelihood:lik, justification:just }) });
+            if(res.ok) alert("Risico opgeslagen!"); else alert("Fout.");
+        }
+
         // --- BULK SELECTION ---
         function toggleSelectAll() {
             const checked = document.getElementById('selectAll').checked;
@@ -414,15 +517,14 @@
         }
         function openBulkModal() {
             updateBulkMsg();
-            updateBulkInput(); // Initialiseer input
+            updateBulkInput();
             new bootstrap.Modal(document.getElementById('bulkModal')).show();
         }
         function updateBulkMsg() { document.getElementById('bulkCountMsg').innerText = t('txt_bulk_msg').replace('{n}', selectedIds.size); }
-        
         function updateBulkInput() {
             const field = document.getElementById('bulkField').value;
             const container = document.getElementById('bulkValueContainer');
-            container.innerHTML = ''; // Clear
+            container.innerHTML = ''; 
 
             if(field === 'subscription_id') {
                 const sel = document.createElement('select'); sel.className = 'form-select'; sel.id = 'bulkValue';
@@ -442,45 +544,13 @@
                 container.appendChild(inp);
             }
         }
-
         async function executeBulkUpdate() {
             const field = document.getElementById('bulkField').value;
             const value = document.getElementById('bulkValue').value;
             const ids = Array.from(selectedIds);
-            
-            const res = await fetch('/api/assets', {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ mode: 'bulk', ids: ids, field: field, value: value })
-            });
-            
-            if(res.ok) {
-                bootstrap.Modal.getInstance(document.getElementById('bulkModal')).hide();
-                loadAssets(currentPage);
-                alert(t('alert_saved'));
-            } else {
-                alert("Error: " + await res.text());
-            }
+            const res = await fetch('/api/assets', { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ mode: 'bulk', ids: ids, field: field, value: value }) });
+            if(res.ok) { bootstrap.Modal.getInstance(document.getElementById('bulkModal')).hide(); loadAssets(currentPage); alert(t('alert_saved')); } else { alert("Error: " + await res.text()); }
         }
-
-        // --- PAGINATION & SEARCH ---
-        function renderPagination() {
-            const nav = document.getElementById('paginationControls'); nav.innerHTML = '';
-            if(totalPages <= 1) return;
-            const prevDisabled = currentPage === 1 ? 'disabled' : '';
-            nav.innerHTML += `<li class="page-item ${prevDisabled}"><a class="page-link" href="#" onclick="changePage(${currentPage - 1})">${t('txt_prev')}</a></li>`;
-            let start = Math.max(1, currentPage - 3); let end = Math.min(totalPages, start + 6);
-            if(end - start < 6) start = Math.max(1, end - 6);
-            if(start > 1) nav.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="changePage(1)">1</a>...</li>`;
-            for(let i=start; i<=end; i++) nav.innerHTML += `<li class="page-item ${i===currentPage?'active':''}"><a class="page-link" href="#" onclick="changePage(${i})">${i}</a></li>`;
-            if(end < totalPages) nav.innerHTML += `<li class="page-item">...<a class="page-link" href="#" onclick="changePage(${totalPages})">${totalPages}</a></li>`;
-            const nextDisabled = currentPage === totalPages ? 'disabled' : '';
-            nav.innerHTML += `<li class="page-item ${nextDisabled}"><a class="page-link" href="#" onclick="changePage(${currentPage + 1})">${t('txt_next')}</a></li>`;
-        }
-        function changePage(p) { if(p<1||p>totalPages) return; loadAssets(p); }
-        function handleSearch() { clearTimeout(searchTimeout); searchTimeout = setTimeout(() => loadAssets(1), 300); }
-        function changeLimit() { loadAssets(1); }
-        function toggleGlobalReveal() { isGlobalRevealed = !isGlobalRevealed; const btn = document.getElementById('globalEyeBtn'); const icon = btn.querySelector('i'); if (isGlobalRevealed) { btn.className='btn btn-warning'; icon.className='bi bi-eye-slash'; } else { btn.className='btn btn-outline-secondary'; icon.className='bi bi-eye'; } document.querySelectorAll('.masked-data').forEach(el => el.classList.toggle('revealed', isGlobalRevealed)); }
 
         // --- NETWORK GRAPH ---
         function openNetworkModal() {
@@ -531,14 +601,7 @@
             if (!hasLayout) networkInstance.on("stabilizationIterationsDone", function () { networkInstance.setOptions( { physics: false } ); });
             networkInstance.on("dragStart", function (params) { networkInstance.setOptions( { physics: false } ); });
         }
-        function togglePhysics() { 
-            if(!networkInstance) return; 
-            const current = networkInstance.physics.physicsEnabled; 
-            networkInstance.setOptions({ physics: !current });
-            const btnText = !current ? t('btn_stop_organize') : t('btn_organize');
-            const btnIcon = !current ? 'bi-pause-fill' : 'bi-play-fill';
-            document.getElementById('physBtn').innerHTML = `<i class="bi ${btnIcon}"></i> ${btnText}`;
-        }
+        function togglePhysics() { if(!networkInstance) return; const current = networkInstance.physics.physicsEnabled; networkInstance.setOptions({ physics: !current }); const btnText = !current ? t('btn_stop_organize') : t('btn_organize'); const btnIcon = !current ? 'bi-pause-fill' : 'bi-play-fill'; document.getElementById('physBtn').innerHTML = `<i class="bi ${btnIcon}"></i> ${btnText}`; }
         async function saveLayout() { if(!networkInstance) return; const positions = networkInstance.getPositions(); await fetch('/api/asset-details', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ type: 'layout', asset_id: currentAssetId, positions: positions }) }); alert(t('alert_saved')); currentLayout = positions; }
         function exportNetworkImage() { if(!networkInstance) return; const canvas = document.querySelector('#networkGraph canvas'); const link = document.createElement('a'); link.download = `network_map_${currentAssetId}.png`; link.href = canvas.toDataURL(); link.click(); }
 
@@ -548,23 +611,33 @@
             try {
                 const res = await fetch(`/api/asset-details?id=${id}`); const data = await res.json();
                 currentRelationships = data.relationships; currentLayout = data.layout;
+                
+                // RENDER RISK MATRIX
+                renderRiskMatrix(data.risk);
+
                 const vT = document.getElementById('vulnTable'); vT.innerHTML=''; data.vulnerabilities.forEach(v => vT.innerHTML+=`<tr><td>${v.name}</td><td>${v.severity}</td><td>${v.status}</td><td>${v.due_date||'-'}</td><td><i class="bi bi-trash text-danger" onclick="deleteDetail('vuln',${v.id})"></i></td></tr>`);
                 const cT = document.getElementById('cisTable'); cT.innerHTML=''; data.cis.forEach(c => cT.innerHTML+=`<tr><td>${c.control_id}</td><td>${c.description}</td><td>${c.justification}</td><td><i class="bi bi-trash text-danger" onclick="deleteDetail('cis',${c.id})"></i></td></tr>`);
                 const hT = document.getElementById('histTable'); hT.innerHTML=''; data.history.forEach(h => hT.innerHTML+=`<tr><td>${new Date(h.timestamp).toLocaleString()}</td><td>${h.changed_by}</td><td>${h.change_type}</td></tr>`);
                 await loadAssetDropdown();
-                const rdT = document.getElementById('relDownTable'); rdT.innerHTML = ''; 
-                data.relationships.downstream.forEach(r => rdT.innerHTML += `<tr><td>${tr(r.relation_type)} <span class="fw-bold">${r.name}</span></td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
-                const ruT = document.getElementById('relUpTable'); ruT.innerHTML = ''; 
-                data.relationships.upstream.forEach(r => ruT.innerHTML += `<tr><td><span class="fw-bold">${r.name}</span> ${tr(r.relation_type)} deze asset</td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
+                const rdT = document.getElementById('relDownTable'); rdT.innerHTML = ''; data.relationships.downstream.forEach(r => rdT.innerHTML += `<tr><td>${tr(r.relation_type)} <span class="fw-bold">${r.name}</span></td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
+                const ruT = document.getElementById('relUpTable'); ruT.innerHTML = ''; data.relationships.upstream.forEach(r => ruT.innerHTML += `<tr><td><span class="fw-bold">${r.name}</span> ${tr(r.relation_type)} deze asset</td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
                 new bootstrap.Modal(document.getElementById('detailModal')).show();
             } catch(e) { console.error(e); alert("Details fout"); }
         }
-        function toggleForm(id) { document.getElementById(id).classList.toggle('d-none'); }
         async function loadAssetDropdown() { const res = await fetch('/api/asset-details?type=list'); const list = await res.json(); const sel = document.getElementById('rTarget'); sel.innerHTML = '<option value="">...</option>'; list.forEach(item => { if(item.id !== currentAssetId) sel.innerHTML += `<option value="${item.id}">${item.name}</option>`; }); }
         async function addRel() { const targetId = document.getElementById('rTarget').value; const type = document.getElementById('rType').value; if(!targetId) return alert("Kies een asset"); await fetch('/api/asset-details', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ type: 'rel', parent_id: currentAssetId, child_id: targetId, relation_type: type }) }); const name = document.getElementById('detailTitle').innerText.replace('Details voor: ', ''); openDetailModal(currentAssetId, name); }
         async function deleteDetail(type, id) { if(!confirm(t('alert_confirm'))) return; await fetch('/api/asset-details', { method: 'DELETE', body: JSON.stringify({type, id}) }); const name = document.getElementById('detailTitle').innerText.replace('Details voor: ', ''); openDetailModal(currentAssetId, name); if(type !== 'rel') loadAssets(currentPage); }
         async function addVuln() { const body = { type: 'vuln', asset_id: currentAssetId, name: document.getElementById('vName').value, severity: document.getElementById('vSev').value, status: document.getElementById('vStat').value, due_date: document.getElementById('vDate').value }; await fetch('/api/asset-details', { method: 'POST', body: JSON.stringify(body) }); document.getElementById('vulnForm').reset(); openDetailModal(currentAssetId, document.getElementById('detailTitle').innerText.replace('Details voor: ', '')); loadAssets(currentPage); }
         async function addCis() { const body = { type: 'cis', asset_id: currentAssetId, control_id: document.getElementById('cId').value, description: document.getElementById('cDesc').value, justification: document.getElementById('cJust').value }; await fetch('/api/asset-details', { method: 'POST', body: JSON.stringify(body) }); document.getElementById('cisForm').reset(); openDetailModal(currentAssetId, document.getElementById('detailTitle').innerText.replace('Details voor: ', '')); }
+        
+        // --- PAGINATION / SEARCH ---
+        function renderPagination() { const nav = document.getElementById('paginationControls'); nav.innerHTML = ''; if(totalPages <= 1) return; const prevDisabled = currentPage === 1 ? 'disabled' : ''; nav.innerHTML += `<li class="page-item ${prevDisabled}"><a class="page-link" href="#" onclick="changePage(${currentPage - 1})">${t('txt_prev')}</a></li>`; let start = Math.max(1, currentPage - 3); let end = Math.min(totalPages, start + 6); if(end - start < 6) start = Math.max(1, end - 6); if(start > 1) nav.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="changePage(1)">1</a>...</li>`; for(let i=start; i<=end; i++) nav.innerHTML += `<li class="page-item ${i===currentPage?'active':''}"><a class="page-link" href="#" onclick="changePage(${i})">${i}</a></li>`; if(end < totalPages) nav.innerHTML += `<li class="page-item">...<a class="page-link" href="#" onclick="changePage(${totalPages})">${totalPages}</a></li>`; const nextDisabled = currentPage === totalPages ? 'disabled' : ''; nav.innerHTML += `<li class="page-item ${nextDisabled}"><a class="page-link" href="#" onclick="changePage(${currentPage + 1})">${t('txt_next')}</a></li>`; }
+        function changePage(p) { if(p<1||p>totalPages) return; loadAssets(p); }
+        function handleSearch() { clearTimeout(searchTimeout); searchTimeout = setTimeout(() => loadAssets(1), 300); }
+        function changeLimit() { loadAssets(1); }
+        function toggleGlobalReveal() { isGlobalRevealed = !isGlobalRevealed; const btn = document.getElementById('globalEyeBtn'); const icon = btn.querySelector('i'); if (isGlobalRevealed) { btn.className='btn btn-warning'; icon.className='bi bi-eye-slash'; } else { btn.className='btn btn-outline-secondary'; icon.className='bi bi-eye'; } document.querySelectorAll('.masked-data').forEach(el => el.classList.toggle('revealed', isGlobalRevealed)); }
+        
+        // --- CRUD BASIC ---
         function openCreateModal() { document.getElementById('assetForm').reset(); document.getElementById('assetId').value = ''; document.getElementById('modalTitle').innerText=t('btn_new_asset'); new bootstrap.Modal(document.getElementById('assetModal')).show(); }
         function openEditModal(id) { const a = allAssets.find(x => x.id === id); document.getElementById('assetId').value=id; document.getElementById('name').value=a.name; document.getElementById('type').value=a.type; document.getElementById('cis').value=a.cis_score; document.getElementById('subSelect').value=a.subscription_id; document.getElementById('owner').value=a.owner_contact; document.getElementById('ip').value=(a.ips||[a.ip_address]).join(', '); document.getElementById('classif').value=a.classification; document.querySelectorAll('.sens-check').forEach(c => c.checked=(a.data_sensitivity||'').includes(c.value)); document.getElementById('modalTitle').innerText='Bewerken'; new bootstrap.Modal(document.getElementById('assetModal')).show(); }
         async function saveAsset() { const id = document.getElementById('assetId').value; const sens=[]; document.querySelectorAll('.sens-check:checked').forEach(c=>sens.push(c.value)); const body = { id:id?id:null, name:document.getElementById('name').value, type:document.getElementById('type').value, cis_score:document.getElementById('cis').value, subscription_id:document.getElementById('subSelect').value, owner_contact:document.getElementById('owner').value, ip_address:document.getElementById('ip').value, classification:document.getElementById('classif').value, data_sensitivity:sens }; const r = await fetch('/api/assets', {method:id?'PUT':'POST', body:JSON.stringify(body)}); if(r.ok) { bootstrap.Modal.getInstance(document.getElementById('assetModal')).hide(); loadAssets(currentPage); } else alert(await r.text()); }
