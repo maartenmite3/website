@@ -1,8 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'node:crypto';
 
-// --- ENCRYPTIE & HASHING FUNCTIES ---
-
-// 1. Encryptie (Voor veilige opslag - omkeerbaar)
+// --- CRYPTO FUNCTIES ---
 function encrypt(text, keyString) {
   if (!text) return null;
   const key = Buffer.alloc(32); key.write(keyString || '');
@@ -13,7 +11,6 @@ function encrypt(text, keyString) {
   return iv.toString('hex') + ':' + encrypted;
 }
 
-// 2. Decryptie (Voor weergave - omkeerbaar)
 function decrypt(encryptedText, keyString) {
   if (!encryptedText || !encryptedText.includes(':')) return encryptedText;
   try {
@@ -28,28 +25,24 @@ function decrypt(encryptedText, keyString) {
   } catch (e) { return "[Fout]"; }
 }
 
-// 3. Hashing (Voor uniekheid check - NIET omkeerbaar, wel vergelijkbaar)
 function hashIP(ip) {
     if (!ip) return null;
     return createHash('sha256').update(ip).digest('hex');
 }
 
-// --- API HANDLERS ---
+// --- API ---
 
 export async function onRequestGet(context) {
   if (!context.data.user) return new Response('Unauthorized', { status: 401 });
   const key = context.env.ENCRYPTION_KEY;
 
-  // Historie ophalen?
-  const url = new URL(context.request.url);
-  const historyId = url.searchParams.get('history');
-  if (historyId) {
-      const { results } = await context.env.MY_DB.prepare("SELECT * FROM asset_history WHERE asset_id = ? ORDER BY timestamp DESC").bind(historyId).all();
-      return Response.json(results);
-  }
-
-  // Assets ophalen
-  const { results } = await context.env.MY_DB.prepare("SELECT * FROM assets ORDER BY created_at DESC").all();
+  // Haal assets op INCLUSIEF de telling van kwetsbaarheden (vuln_count)
+  const { results } = await context.env.MY_DB.prepare(`
+    SELECT a.*, 
+    (SELECT COUNT(*) FROM vulnerabilities WHERE asset_id = a.id AND status != 'Opgelost') as vuln_count 
+    FROM assets a 
+    ORDER BY a.created_at DESC
+  `).all();
 
   const decryptedResults = results.map(asset => {
       return {
@@ -68,19 +61,12 @@ export async function onRequestPost(context) {
   const key = context.env.ENCRYPTION_KEY;
   const data = await context.request.json();
 
-  // --- VALIDATIE CHECK (NIEUW) ---
   const ipHash = hashIP(data.ip_address);
-  
-  // Zoek of er al een asset is met deze NAAM of IP HASH
-  const existing = await context.env.MY_DB.prepare(
-      "SELECT id, name, ip_hash FROM assets WHERE name = ? OR ip_hash = ?"
-  ).bind(data.name, ipHash).first();
-
+  const existing = await context.env.MY_DB.prepare("SELECT id, name, ip_hash FROM assets WHERE name = ? OR ip_hash = ?").bind(data.name, ipHash).first();
   if (existing) {
-      if (existing.name === data.name) return new Response('Er bestaat al een asset met deze naam.', { status: 409 });
-      if (existing.ip_hash === ipHash) return new Response('Er bestaat al een asset met dit IP adres.', { status: 409 });
+      if (existing.name === data.name) return new Response('Naam bestaat al.', { status: 409 });
+      if (existing.ip_hash === ipHash) return new Response('IP bestaat al.', { status: 409 });
   }
-  // -------------------------------
 
   const encSub = encrypt(data.subscription_id, key);
   const encIp = encrypt(data.ip_address, key);
@@ -93,7 +79,6 @@ export async function onRequestPost(context) {
   `).bind(data.name, data.type, encSub, encIp, ipHash, data.cis_score, data.classification, sensitivity, encOwner, Date.now()).first();
 
   await logHistory(context, res.id, 'CREATE', null, JSON.stringify(data));
-
   return new Response('Asset toegevoegd', { status: 201 });
 }
 
@@ -103,20 +88,12 @@ export async function onRequestPut(context) {
     const data = await context.request.json();
     const id = data.id;
 
-    // --- VALIDATIE CHECK (NIEUW) ---
-    // Bij update moeten we checken of de naam/ip bestaat, MAAR niet als het de asset zelf is (id != id)
+    // Check uniekheid (behalve zelf)
     const ipHash = hashIP(data.ip_address);
-    
-    const existing = await context.env.MY_DB.prepare(
-        "SELECT id, name, ip_hash FROM assets WHERE (name = ? OR ip_hash = ?) AND id != ?"
-    ).bind(data.name, ipHash, id).first();
+    const existing = await context.env.MY_DB.prepare("SELECT id FROM assets WHERE (name = ? OR ip_hash = ?) AND id != ?").bind(data.name, ipHash, id).first();
+    if (existing) return new Response('Naam of IP al in gebruik.', { status: 409 });
 
-    if (existing) {
-        if (existing.name === data.name) return new Response('Naam is al in gebruik bij een andere asset.', { status: 409 });
-        if (existing.ip_hash === ipHash) return new Response('IP is al in gebruik bij een andere asset.', { status: 409 });
-    }
-    // -------------------------------
-
+    // Historie ophalen
     const oldAsset = await context.env.MY_DB.prepare("SELECT * FROM assets WHERE id = ?").bind(id).first();
     const readableOld = { ...oldAsset, ip_address: decrypt(oldAsset.ip_address, key) };
 
@@ -131,14 +108,16 @@ export async function onRequestPut(context) {
     `).bind(data.name, data.type, encSub, encIp, ipHash, data.cis_score, data.classification, sensitivity, encOwner, id).run();
 
     await logHistory(context, id, 'UPDATE', JSON.stringify(readableOld), JSON.stringify(data));
-
     return new Response('Updated');
 }
 
 export async function onRequestDelete(context) {
     if (!context.data.user) return new Response('Unauthorized', { status: 401 });
     const { id } = await context.request.json();
+    // Verwijder asset EN gekoppelde details
     await context.env.MY_DB.prepare("DELETE FROM assets WHERE id = ?").bind(id).run();
+    await context.env.MY_DB.prepare("DELETE FROM vulnerabilities WHERE asset_id = ?").bind(id).run();
+    await context.env.MY_DB.prepare("DELETE FROM cis_exceptions WHERE asset_id = ?").bind(id).run();
     await context.env.MY_DB.prepare("DELETE FROM asset_history WHERE asset_id = ?").bind(id).run();
     return new Response('Verwijderd');
 }
