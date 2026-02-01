@@ -6,6 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    
     <style>
         .confidential { border-left: 5px solid #dc3545; background-color: #fffbfb; }
         .internal { border-left: 5px solid #ffc107; }
@@ -13,6 +16,9 @@
         .masked-data { filter: blur(5px); cursor: pointer; transition: 0.2s; user-select: none; display: inline-block; }
         .masked-data:hover, .masked-data.revealed { filter: none; }
         .clickable-asset { cursor: pointer; color: #0d6efd; font-weight: bold; text-decoration: underline; }
+        
+        /* Stijl voor de graaf */
+        #networkGraph { width: 100%; height: 500px; border: 1px solid #ddd; background-color: #f8f9fa; }
     </style>
 </head>
 <body class="bg-light">
@@ -92,15 +98,13 @@
             <div class="modal-content">
                 <div class="modal-header"><h5 class="modal-title" id="detailTitle">Details</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body p-0">
-                    <ul class="nav nav-tabs nav-fill bg-light" id="detailTabs" role="tablist">
-                        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabVuln" type="button">🛑 Kwetsbaarheden</button></li>
-                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabCis" type="button">✅ CIS</button></li>
-                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabRel" type="button">🔗 Relaties</button></li>
-                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabHist" type="button">🕒 Geschiedenis</button></li>
+                    <ul class="nav nav-tabs nav-fill bg-light" role="tablist">
+                        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabVuln">🛑 Kwetsbaarheden</a></li>
+                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabCis">✅ CIS</a></li>
+                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabRel">🔗 Relaties</a></li>
+                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabHist">🕒 Geschiedenis</a></li>
                     </ul>
-                    
                     <div class="tab-content p-3">
-                        
                         <div class="tab-pane fade show active" id="tabVuln">
                             <form id="vulnForm" class="row g-2 mb-3 bg-light p-2 border rounded">
                                 <div class="col-md-3"><input type="text" id="vName" class="form-control form-control-sm" placeholder="Kwetsbaarheid"></div>
@@ -123,7 +127,13 @@
                         </div>
 
                         <div class="tab-pane fade" id="tabRel">
-                            <div class="alert alert-info py-2 small">Koppel assets aan elkaar.</div>
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div class="alert alert-info py-2 small mb-0 flex-grow-1 me-3">Koppel assets om afhankelijkheden in kaart te brengen.</div>
+                                <button class="btn btn-primary shadow-sm text-nowrap" onclick="openNetworkModal()">
+                                    <i class="bi bi-diagram-3-fill"></i> Toon Netwerk Diagram
+                                </button>
+                            </div>
+
                             <form id="relForm" class="row g-2 mb-3 bg-light p-2 border rounded align-items-center">
                                 <div class="col-auto">Deze asset...</div>
                                 <div class="col-md-3">
@@ -134,20 +144,38 @@
                                         <option value="Is onderdeel van">Is onderdeel van</option>
                                     </select>
                                 </div>
-                                <div class="col-md-4">
-                                    <select id="rTarget" class="form-select form-select-sm"><option>Laden...</option></select>
-                                </div>
+                                <div class="col-md-4"><select id="rTarget" class="form-select form-select-sm"><option>Laden...</option></select></div>
                                 <div class="col-md-2"><button type="button" onclick="addRel()" class="btn btn-sm btn-success w-100">Koppelen</button></div>
                             </form>
                             
-                            <h6>Afhankelijkheden (Waar deze asset van afhangt)</h6>
+                            <h6>Afhankelijkheden (Downstream)</h6>
                             <table class="table table-sm table-bordered mb-3"><tbody id="relDownTable"></tbody></table>
                             
-                            <h6>Gebruikt door (Wie van deze asset afhangt)</h6>
+                            <h6>Wordt gebruikt door (Upstream)</h6>
                             <table class="table table-sm table-bordered"><tbody id="relUpTable"></tbody></table>
                         </div>
 
                         <div class="tab-pane fade" id="tabHist"><table class="table table-sm text-muted small"><thead><tr><th>Tijd</th><th>Wie</th><th>Type</th></tr></thead><tbody id="histTable"></tbody></table></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="networkModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title"><i class="bi bi-diagram-2"></i> Netwerk Overzicht</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0 position-relative">
+                    <div id="networkGraph"></div>
+                    
+                    <div class="position-absolute top-0 end-0 m-3">
+                        <button class="btn btn-light shadow-sm border" onclick="exportNetworkImage()">
+                            <i class="bi bi-camera"></i> Opslaan als plaatje
+                        </button>
                     </div>
                 </div>
             </div>
@@ -173,8 +201,9 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        let allAssets = []; let allSubs = []; let currentAssetId = null;
+        let allAssets = []; let allSubs = []; let currentAssetId = null; let currentRelationships = null;
         let isGlobalRevealed = false; let importData = { new: [] }; let searchTimeout = null;
+        let networkInstance = null; // Vis.js instance
 
         // INIT
         loadSubs();
@@ -207,7 +236,67 @@
             document.body.appendChild(link); link.click(); document.body.removeChild(link);
         }
 
-        // 2. RELATIE FUNCTIES
+        // 2. NETWERK GRAFIEK FUNCTIES (NIEUW)
+        function openNetworkModal() {
+            if(!currentRelationships) return alert("Geen data geladen");
+            
+            // Toon modal
+            new bootstrap.Modal(document.getElementById('networkModal')).show();
+            
+            // Wacht even tot modal zichtbaar is voor rendering
+            setTimeout(drawNetwork, 500);
+        }
+
+        function drawNetwork() {
+            const nodes = [];
+            const edges = [];
+            
+            // 1. Centraal (Huidige Asset)
+            // We hebben de naam nodig, die staat in de titel van de detail modal of in allAssets
+            const currentName = document.getElementById('detailTitle').innerText.replace('Details voor: ', '');
+            nodes.push({ id: currentAssetId, label: currentName, color: '#0d6efd', shape: 'box', font: {color:'white'} });
+
+            // 2. Downstream (Ik hang af van...) -> Pijl van Mij naar Hen
+            currentRelationships.downstream.forEach(r => {
+                nodes.push({ id: r.linked_asset_id, label: r.name, color: '#ffc107', shape: 'ellipse' });
+                edges.push({ from: currentAssetId, to: r.linked_asset_id, label: r.relation_type, arrows: 'to' });
+            });
+
+            // 3. Upstream (Zij hangen van mij af) -> Pijl van Hen naar Mij
+            currentRelationships.upstream.forEach(r => {
+                // Check of node al bestaat (dubbele relaties)
+                if(!nodes.find(n => n.id === r.linked_asset_id)) {
+                    nodes.push({ id: r.linked_asset_id, label: r.name, color: '#198754', shape: 'ellipse' });
+                }
+                edges.push({ from: r.linked_asset_id, to: currentAssetId, label: r.relation_type, arrows: 'to' });
+            });
+
+            const container = document.getElementById('networkGraph');
+            const data = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
+            const options = {
+                physics: { enabled: true, stabilization: { iterations: 200 } },
+                layout: { randomSeed: 2 },
+                interaction: { zoomView: true, dragView: true }
+            };
+
+            networkInstance = new vis.Network(container, data, options);
+        }
+
+        function exportNetworkImage() {
+            if(!networkInstance) return;
+            
+            // Trucje: canvas tekenen op witte achtergrond
+            const canvas = document.querySelector('#networkGraph canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Sla op
+            const link = document.createElement('a');
+            link.download = `network_map_${currentAssetId}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        // 3. RELATIE FUNCTIES
         async function loadAssetDropdown() {
             const res = await fetch('/api/asset-details?type=list');
             const list = await res.json();
@@ -229,7 +318,6 @@
                 body: JSON.stringify({ type: 'rel', parent_id: currentAssetId, child_id: targetId, relation_type: type }) 
             });
             
-            // Ververs data zonder modal te sluiten
             const name = document.getElementById('detailTitle').innerText.replace('Details voor: ', '');
             openDetailModal(currentAssetId, name);
         }
@@ -292,11 +380,9 @@
                 const ips = a.ips||[]; const ipDisp = (ips[0]||a.ip_address||'') + (ips.length>1?` <span class="badge bg-secondary">+${ips.length-1}</span>`:'');
                 const rev = isGlobalRevealed?'revealed':'';
 
-                // CIS WEERGAVE LOGICA (AANGEPAST)
+                // CIS FIX: Network Interface = N.v.t.
                 let cisDisplay = `<span class="${a.cis_score<50?'text-danger fw-bold':(a.cis_score<70?'text-warning':'text-success')}">${a.cis_score||0}%</span>`;
-                if(a.type === 'Network Interface') {
-                    cisDisplay = '<span class="text-muted small">N.v.t.</span>';
-                }
+                if(a.type === 'Network Interface') cisDisplay = '<span class="text-muted small">N.v.t.</span>';
 
                 tbody.innerHTML += `
                     <tr class="${rCls}">
@@ -321,11 +407,13 @@
             currentAssetId = id;
             document.getElementById('detailTitle').innerText = `Details voor: ${name}`;
             
-            // LAAD DATA
             try {
                 const res = await fetch(`/api/asset-details?id=${id}`);
                 const data = await res.json();
                 
+                // Opslaan voor grafiek
+                currentRelationships = data.relationships;
+
                 // Vul Vulns
                 const vT = document.getElementById('vulnTable'); vT.innerHTML='';
                 data.vulnerabilities.forEach(v => vT.innerHTML+=`<tr><td>${v.name}</td><td>${v.severity}</td><td>${v.status}</td><td>${v.due_date||'-'}</td><td><i class="bi bi-trash text-danger" onclick="deleteDetail('vuln',${v.id})"></i></td></tr>`);
@@ -335,12 +423,9 @@
                 data.cis.forEach(c => cT.innerHTML+=`<tr><td>${c.control_id}</td><td>${c.description}</td><td>${c.justification}</td><td><i class="bi bi-trash text-danger" onclick="deleteDetail('cis',${c.id})"></i></td></tr>`);
                 
                 // Vul Relaties
-                // BELANGRIJK: Eerst dropdown vullen!
                 await loadAssetDropdown(); 
-                
                 const rdT = document.getElementById('relDownTable'); rdT.innerHTML = '';
                 data.relationships.downstream.forEach(r => rdT.innerHTML += `<tr><td>${r.relation_type} <span class="fw-bold">${r.name}</span></td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
-                
                 const ruT = document.getElementById('relUpTable'); ruT.innerHTML = '';
                 data.relationships.upstream.forEach(r => ruT.innerHTML += `<tr><td><span class="fw-bold">${r.name}</span> ${r.relation_type} deze asset</td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
 
