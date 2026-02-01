@@ -90,7 +90,20 @@
                         <input type="hidden" id="assetId">
                         <div class="row g-3">
                             <div class="col-md-6"><label data-i18n="lbl_name">Naam</label><input type="text" id="name" class="form-control" required></div>
-                            <div class="col-md-3"><label>Type</label><select id="type" class="form-select"><option>Virtual Machine</option><option>SQL Database</option><option>App Service</option><option>Firewall</option><option>Network Interface</option><option>Key Vault</option><option>Storage Account</option><option>Recovery Services Vault</option><option>Private Endpoint</option></select></div>
+                            <div class="col-md-3">
+                                <label>Type</label>
+                                <select id="type" class="form-select">
+                                    <option value="Virtual Machine" data-i18n-val="Virtual Machine">Virtual Machine</option>
+                                    <option value="SQL Database" data-i18n-val="SQL Database">SQL Database</option>
+                                    <option value="App Service" data-i18n-val="App Service">App Service</option>
+                                    <option value="Firewall" data-i18n-val="Firewall">Firewall</option>
+                                    <option value="Network Interface" data-i18n-val="Network Interface">Network Interface</option>
+                                    <option value="Key Vault" data-i18n-val="Key Vault">Key Vault</option>
+                                    <option value="Storage Account" data-i18n-val="Storage Account">Storage Account</option>
+                                    <option value="Recovery Services Vault" data-i18n-val="Recovery Services Vault">Recovery Services Vault</option>
+                                    <option value="Private Endpoint" data-i18n-val="Private Endpoint">Private Endpoint</option>
+                                </select>
+                            </div>
                             <div class="col-md-3"><label>CIS Score</label><input type="number" id="cis" class="form-control" placeholder="0-100"></div>
                             <div class="col-md-6"><label data-i18n="lbl_sub">Subscriptie</label><select id="subSelect" class="form-select"></select></div>
                             <div class="col-md-6"><label class="text-danger" data-i18n="lbl_owner">Eigenaar</label><input type="text" id="owner" class="form-control"></div>
@@ -150,7 +163,14 @@
                             </div>
                             <form id="relForm" class="row g-2 mb-3 bg-light p-2 border rounded align-items-center">
                                 <div class="col-auto" data-i18n="lbl_this_asset">Deze asset...</div>
-                                <div class="col-md-3"><select id="rType" class="form-select form-select-sm"><option value="Draait op">Draait op</option><option value="Verbonden met">Verbonden met</option><option value="Afhankelijk van">Afhankelijk van</option></select></div>
+                                <div class="col-md-3">
+                                    <select id="rType" class="form-select form-select-sm">
+                                        <option value="Draait op" data-i18n-val="Draait op">Draait op</option>
+                                        <option value="Verbonden met" data-i18n-val="Verbonden met">Verbonden met</option>
+                                        <option value="Afhankelijk van" data-i18n-val="Afhankelijk van">Afhankelijk van</option>
+                                        <option value="Is onderdeel van" data-i18n-val="Is onderdeel van">Is onderdeel van</option>
+                                    </select>
+                                </div>
                                 <div class="col-md-4"><select id="rTarget" class="form-select form-select-sm"><option>Laden...</option></select></div>
                                 <div class="col-md-2"><button type="button" onclick="addRel()" class="btn btn-sm btn-success w-100" data-i18n="btn_link">Koppelen</button></div>
                             </form>
@@ -170,13 +190,11 @@
                 <div class="modal-header bg-dark text-white"><h5 class="modal-title"><i class="bi bi-diagram-2"></i> <span data-i18n="modal_network">Netwerk Overzicht</span></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body p-0 position-relative">
                     <div id="networkGraph"></div>
-                    
                     <div class="position-absolute top-0 end-0 m-3 d-flex gap-2">
                         <button class="btn btn-light shadow-sm border btn-sm" onclick="togglePhysics()" id="physBtn"><i class="bi bi-play-fill"></i> <span data-i18n="btn_organize">Organiseren</span></button>
                         <button class="btn btn-primary shadow-sm border btn-sm" onclick="saveLayout()"><i class="bi bi-save"></i> <span data-i18n="btn_save_layout">Opslaan</span></button>
                         <button class="btn btn-light shadow-sm border btn-sm" onclick="exportNetworkImage()"><i class="bi bi-camera"></i> <span data-i18n="btn_photo">Foto</span></button>
                     </div>
-
                     <div class="position-absolute bottom-0 start-0 m-3 small bg-white p-2 rounded border shadow-sm">
                         <div id="threatAlert" class="text-danger fw-bold mb-1 d-none"><i class="bi bi-exclamation-triangle"></i> <span data-i18n="lbl_cross_sub">Cross-Subscription!</span></div>
                         <div><span style="color:#0d6efd">●</span> <span data-i18n="lbl_current_asset">Huidige Asset</span></div>
@@ -207,7 +225,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // --- TRANSLATIONS CONFIG ---
+        // --- TRANSLATIONS & DATA MAPPING ---
         const translations = {
             nl: {
                 btn_manage_subs: "Beheer Subscripties", btn_dashboard: "Dashboard", btn_new_asset: "Nieuwe Asset", btn_import: "Import", btn_export: "Export", opt_all: "Alles",
@@ -219,7 +237,6 @@
                 hdr_downstream: "Afhankelijkheden (Downstream)", hdr_upstream: "Wordt gebruikt door (Upstream)", rel_info: "Koppel assets om afhankelijkheden in kaart te brengen.", lbl_this_asset: "Deze asset...",
                 modal_network: "Netwerk Overzicht", modal_import: "Importeren", btn_analyze: "Analyseren", tab_new: "Nieuw", btn_start_import: "Start Import",
                 txt_prev: "Vorige", txt_next: "Volgende", txt_no_data: "Geen data", alert_saved: "Opgeslagen", alert_deleted: "Verwijderd", alert_confirm: "Zeker weten?",
-                // Network Modal Specifics
                 btn_organize: "Organiseren", btn_stop_organize: "Stop Organiseren", btn_save_layout: "Layout Opslaan", btn_photo: "Foto",
                 lbl_cross_sub: "Cross-Subscription Gedetecteerd!", lbl_current_asset: "Huidige Asset", lbl_downstream: "Afhankelijkheden", lbl_upstream: "Gebruikt door"
             },
@@ -233,9 +250,20 @@
                 hdr_downstream: "Dependencies (Downstream)", hdr_upstream: "Used by (Upstream)", rel_info: "Link assets to map dependencies.", lbl_this_asset: "This asset...",
                 modal_network: "Network Overview", modal_import: "Import", btn_analyze: "Analyze", tab_new: "New", btn_start_import: "Start Import",
                 txt_prev: "Previous", txt_next: "Next", txt_no_data: "No data", alert_saved: "Saved", alert_deleted: "Deleted", alert_confirm: "Are you sure?",
-                // Network Modal Specifics
                 btn_organize: "Organize", btn_stop_organize: "Stop Organizing", btn_save_layout: "Save Layout", btn_photo: "Photo",
                 lbl_cross_sub: "Cross-Subscription Detected!", lbl_current_asset: "Current Asset", lbl_downstream: "Dependencies", lbl_upstream: "Used by"
+            }
+        };
+
+        // --- DATABASE WAARDEN VERTALING ---
+        const dataTranslations = {
+            nl: {
+                "Draait op": "Draait op", "Verbonden met": "Verbonden met", "Afhankelijk van": "Afhankelijk van", "Is onderdeel van": "Is onderdeel van",
+                "Virtual Machine": "Virtual Machine", "Network Interface": "Netwerk Interface", "SQL Database": "SQL Database", "Key Vault": "Key Vault", "Storage Account": "Storage Account", "Recovery Services Vault": "Recovery Services Vault", "Private Endpoint": "Private Endpoint", "App Service": "App Service", "Firewall": "Firewall"
+            },
+            en: {
+                "Draait op": "Runs on", "Verbonden met": "Connected to", "Afhankelijk van": "Depends on", "Is onderdeel van": "Is part of",
+                "Virtual Machine": "Virtual Machine", "Network Interface": "Network Interface", "SQL Database": "SQL Database", "Key Vault": "Key Vault", "Storage Account": "Storage Account", "Recovery Services Vault": "Recovery Services Vault", "Private Endpoint": "Private Endpoint", "App Service": "App Service", "Firewall": "Firewall"
             }
         };
 
@@ -244,16 +272,33 @@
         function applyLanguage() {
             const lang = localStorage.getItem('lang') || 'nl';
             document.getElementById('currentLang').innerText = lang.toUpperCase();
+            
+            // 1. UI Teksten
             document.querySelectorAll('[data-i18n]').forEach(el => {
                 const key = el.getAttribute('data-i18n');
                 if(translations[lang][key]) el.innerText = translations[lang][key];
             });
-            if(allAssets.length > 0) renderPagination(); 
+
+            // 2. Dropdown Opties (Behoud Value, verander tekst)
+            document.querySelectorAll('option[data-i18n-val]').forEach(opt => {
+                const key = opt.getAttribute('data-i18n-val');
+                opt.innerText = dataTranslations[lang][key] || key;
+            });
+
+            // Herlaad data weergave
+            if(allAssets.length > 0) { renderTable(allAssets); renderPagination(); }
         }
         function t(key) { const lang = localStorage.getItem('lang') || 'nl'; return translations[lang][key] || key; }
+        
+        // Vertaal Data uit DB (e.g. "Draait op" -> "Runs on")
+        function tr(value) {
+            const lang = localStorage.getItem('lang') || 'nl';
+            return dataTranslations[lang][value] || value;
+        }
 
         // --- GLOBAL VARS ---
-        let allAssets = []; let allSubs = []; let currentAssetId = null; let currentRelationships = null; let currentLayout = null;
+        let allAssets = []; let allSubs = []; let currentAssetId = null; 
+        let currentRelationships = null; let currentLayout = null;
         let isGlobalRevealed = false; let importData = { new: [] }; let searchTimeout = null; let networkInstance = null;
         let currentPage = 1; let totalPages = 1;
 
@@ -287,10 +332,8 @@
             const query = document.getElementById('searchBar').value;
             currentPage = page;
             let url = `/api/assets?limit=${limit}&page=${page}`; if(query) url += `&q=${encodeURIComponent(query)}`;
-            
             const tbody = document.getElementById('assetTable');
             tbody.innerHTML = `<tr><td colspan="9" class="p-4 text-center">${t('loading')}</td></tr>`;
-            
             const res = await fetch(url);
             if(res.status === 401) return window.location.href='/login.html';
             const response = await res.json();
@@ -311,7 +354,24 @@
                 let cisDisplay = `<span class="${a.cis_score<50?'text-danger fw-bold':(a.cis_score<70?'text-warning':'text-success')}">${a.cis_score||0}%</span>`;
                 if(a.type === 'Network Interface') cisDisplay = '<span class="text-muted small">N.v.t.</span>';
                 const imgUrl = getAssetImage(a.name, a.type);
-                tbody.innerHTML += `<tr class="${rCls}"><td><div class="d-flex align-items-center"><img src="${imgUrl}" class="asset-icon-img" alt="icon"><div><span class="clickable-asset" onclick="openDetailModal(${a.id}, '${a.name}')">${a.name}</span><br><small class="text-muted">${a.type}</small></div></div></td><td><span class="masked-data ${rev}" onclick="this.classList.toggle('revealed')">${ipDisp}</span></td><td><span class="masked-data ${rev}" onclick="this.classList.toggle('revealed')">${subDisp}</span></td><td><span class="masked-data ${rev}" onclick="this.classList.toggle('revealed')">${a.owner_contact}</span></td><td>${(a.data_sensitivity||'').split(',').map(l=>l?`<span class="badge bg-secondary me-1">${l}</span>`:'').join('')}</td><td>${cisDisplay}</td><td>${vBadge}</td><td>${a.classification}</td><td class="text-end"><button class="btn btn-sm btn-outline-primary" onclick="openEditModal(${a.id})"><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-outline-danger" onclick="deleteAsset(${a.id})"><i class="bi bi-trash"></i></button></td></tr>`;
+
+                tbody.innerHTML += `
+                    <tr class="${rCls}">
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <img src="${imgUrl}" class="asset-icon-img" alt="icon">
+                                <div><span class="clickable-asset" onclick="openDetailModal(${a.id}, '${a.name}')">${a.name}</span><br><small class="text-muted">${tr(a.type)}</small></div>
+                            </div>
+                        </td>
+                        <td><span class="masked-data ${rev}" onclick="this.classList.toggle('revealed')">${ipDisp}</span></td>
+                        <td><span class="masked-data ${rev}" onclick="this.classList.toggle('revealed')">${subDisp}</span></td>
+                        <td><span class="masked-data ${rev}" onclick="this.classList.toggle('revealed')">${a.owner_contact}</span></td>
+                        <td>${(a.data_sensitivity||'').split(',').map(l=>l?`<span class="badge bg-secondary me-1">${l}</span>`:'').join('')}</td>
+                        <td>${cisDisplay}</td>
+                        <td>${vBadge}</td>
+                        <td>${a.classification}</td>
+                        <td class="text-end"><button class="btn btn-sm btn-outline-primary" onclick="openEditModal(${a.id})"><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-outline-danger" onclick="deleteAsset(${a.id})"><i class="bi bi-trash"></i></button></td>
+                    </tr>`;
             });
         }
 
@@ -366,7 +426,8 @@
                 if(!nodes.find(n => n.id === r.linked_asset_id)) {
                     nodes.push({ id: r.linked_asset_id, label: r.name, shape: 'image', image: img, shapeProperties: { useBorderWithImage: true }, borderWidth: borderWidth, color: { border: borderColor, background: '#fff' }, x: nodePos.x, y: nodePos.y });
                 }
-                edges.push({ from: currentAssetId, to: r.linked_asset_id, label: r.relation_type, arrows: 'to', color: { color: edgeColor }, dashes: dashes, width: isCrossSub ? 2 : 1 });
+                // HIER: Vertaal de relatie text (r.relation_type)
+                edges.push({ from: currentAssetId, to: r.linked_asset_id, label: tr(r.relation_type), arrows: 'to', color: { color: edgeColor }, dashes: dashes, width: isCrossSub ? 2 : 1 });
             };
             currentRelationships.downstream.forEach(r => addLinkedNode(r, '#ffc107'));
             currentRelationships.upstream.forEach(r => addLinkedNode(r, '#198754'));
@@ -393,21 +454,6 @@
         async function saveLayout() { if(!networkInstance) return; const positions = networkInstance.getPositions(); await fetch('/api/asset-details', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ type: 'layout', asset_id: currentAssetId, positions: positions }) }); alert(t('alert_saved')); currentLayout = positions; }
         function exportNetworkImage() { if(!networkInstance) return; const canvas = document.querySelector('#networkGraph canvas'); const link = document.createElement('a'); link.download = `network_map_${currentAssetId}.png`; link.href = canvas.toDataURL(); link.click(); }
 
-        // --- EXPORT ---
-        async function exportCSV() {
-            const res = await fetch('/api/assets?limit=all'); if(!res.ok) return alert('Fout'); const json = await res.json(); const data = json.data;
-            if(!data.length) return alert(t('txt_no_data'));
-            const headers = ["ID", "Naam", "Type", "IP Adressen", "Subscriptie", "Eigenaar", "CIS Score", "Classificatie", "Gevoeligheid", "Vuln Count"];
-            let csv = headers.join(",") + "\n";
-            data.forEach(a => {
-                const subObj = allSubs.find(s => s.guid === a.subscription_id); const subName = subObj ? subObj.name : a.subscription_id;
-                const ips = (a.ips && a.ips.length > 0) ? a.ips.join(";") : a.ip_address;
-                const row = [a.id, `"${a.name}"`, `"${a.type}"`, `"${ips}"`, `"${subName}"`, `"${a.owner_contact}"`, a.cis_score||0, a.classification, `"${(a.data_sensitivity||'').replace(/,/g,';')}"`, a.vuln_count];
-                csv += row.join(",") + "\n";
-            });
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `assets_export_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(link); link.click(); document.body.removeChild(link);
-        }
-
         // --- CRUD & DETAILS ---
         async function openDetailModal(id, name) {
             currentAssetId = id; document.getElementById('detailTitle').innerText = `Details voor: ${name}`;
@@ -418,8 +464,11 @@
                 const cT = document.getElementById('cisTable'); cT.innerHTML=''; data.cis.forEach(c => cT.innerHTML+=`<tr><td>${c.control_id}</td><td>${c.description}</td><td>${c.justification}</td><td><i class="bi bi-trash text-danger" onclick="deleteDetail('cis',${c.id})"></i></td></tr>`);
                 const hT = document.getElementById('histTable'); hT.innerHTML=''; data.history.forEach(h => hT.innerHTML+=`<tr><td>${new Date(h.timestamp).toLocaleString()}</td><td>${h.changed_by}</td><td>${h.change_type}</td></tr>`);
                 await loadAssetDropdown();
-                const rdT = document.getElementById('relDownTable'); rdT.innerHTML = ''; data.relationships.downstream.forEach(r => rdT.innerHTML += `<tr><td>${r.relation_type} <span class="fw-bold">${r.name}</span></td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
-                const ruT = document.getElementById('relUpTable'); ruT.innerHTML = ''; data.relationships.upstream.forEach(r => ruT.innerHTML += `<tr><td><span class="fw-bold">${r.name}</span> ${r.relation_type} deze asset</td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
+                const rdT = document.getElementById('relDownTable'); rdT.innerHTML = ''; 
+                // HIER OOK VERTALING TOEPASSEN (tr)
+                data.relationships.downstream.forEach(r => rdT.innerHTML += `<tr><td>${tr(r.relation_type)} <span class="fw-bold">${r.name}</span></td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
+                const ruT = document.getElementById('relUpTable'); ruT.innerHTML = ''; 
+                data.relationships.upstream.forEach(r => ruT.innerHTML += `<tr><td><span class="fw-bold">${r.name}</span> ${tr(r.relation_type)} deze asset</td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
                 new bootstrap.Modal(document.getElementById('detailModal')).show();
             } catch(e) { console.error(e); alert("Details fout"); }
         }
