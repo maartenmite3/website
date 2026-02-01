@@ -2,14 +2,15 @@
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-    <title>Asset Inventory (Secured)</title>
+    <title>Asset Inventory</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
         .confidential { border-left: 5px solid #dc3545; background-color: #fff8f8; }
         .internal { border-left: 5px solid #ffc107; }
         .public { border-left: 5px solid #198754; }
-        .secret { border-left: 5px solid #000; background-color: #f0f0f0; }
+        .masked-data { filter: blur(4px); cursor: pointer; transition: 0.2s; user-select: none; }
+        .masked-data:hover, .masked-data.revealed { filter: none; }
     </style>
 </head>
 <body class="bg-light">
@@ -17,14 +18,20 @@
     <nav class="navbar navbar-dark bg-dark mb-4">
         <div class="container">
             <span class="navbar-brand"><i class="bi bi-shield-shaded"></i> Asset Inventory</span>
-            <a href="/" class="btn btn-outline-light btn-sm">Terug naar Dashboard</a>
+            <div>
+                <a href="/subscriptions.html" class="btn btn-outline-info btn-sm me-2">Beheer Subscripties</a>
+                <a href="/" class="btn btn-outline-light btn-sm">Dashboard</a>
+            </div>
         </div>
     </nav>
 
     <div class="container">
-        <button class="btn btn-primary mb-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#newAssetModal">
-            <i class="bi bi-plus-lg"></i> Nieuwe Asset Toevoegen
-        </button>
+        <div class="d-flex justify-content-between mb-3">
+            <button class="btn btn-primary" onclick="openModal()">
+                <i class="bi bi-plus-lg"></i> Nieuwe Asset
+            </button>
+            <input type="text" id="searchBar" class="form-control w-25" placeholder="Zoeken..." onkeyup="filterTable()">
+        </div>
 
         <div class="card shadow-sm border-0">
             <div class="card-body p-0">
@@ -32,88 +39,100 @@
                     <thead class="table-light">
                         <tr>
                             <th>Asset</th>
-                            <th>Info</th>
-                            <th>Compliance</th>
+                            <th>Data Labels</th>
+                            <th>Compliance (CIS)</th>
                             <th>Classificatie</th>
-                            <th>Gevoelige Info (Ontsleuteld)</th>
-                            <th>Actie</th>
+                            <th>Gevoelige Info (Klik om te zien)</th>
+                            <th class="text-end">Acties</th>
                         </tr>
                     </thead>
-                    <tbody id="assetTable">
-                        <tr><td colspan="6" class="text-center p-4 text-muted">Laden...</td></tr>
-                    </tbody>
+                    <tbody id="assetTable"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <div class="modal fade" id="newAssetModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg"> <div class="modal-content">
+    <div class="modal fade" id="assetModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title"><i class="bi bi-shield-lock"></i> Nieuwe Asset Registreren</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <h5 class="modal-title" id="modalTitle">Asset</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="assetForm" class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Asset Naam (Hostname)</label>
-                            <input type="text" id="name" class="form-control" required placeholder="bv. prod-db-01">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Type</label>
-                            <select id="type" class="form-select">
-                                <option>Virtual Machine</option>
-                                <option>SQL Database</option>
-                                <option>Storage Account</option>
-                                <option>App Service</option>
-                                <option>Firewall</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">CIS Score (%)</label>
-                            <input type="number" id="cis" class="form-control" placeholder="0-100">
-                        </div>
+                    <form id="assetForm">
+                        <input type="hidden" id="assetId"> <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Naam</label>
+                                <input type="text" id="name" class="form-control" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Type</label>
+                                <select id="type" class="form-select">
+                                    <option>Virtual Machine</option><option>SQL Database</option>
+                                    <option>App Service</option><option>Firewall</option><option>Storage</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">CIS Score</label>
+                                <input type="number" id="cis" class="form-control" placeholder="0-100">
+                            </div>
 
-                        <div class="col-12"><hr class="text-muted"></div>
-                        <p class="small text-muted mb-2"><i class="bi bi-lock-fill"></i> Onderstaande velden worden versleuteld opgeslagen.</p>
-                        
-                        <div class="col-md-6">
-                            <label class="form-label text-danger">IP Adres</label>
-                            <input type="text" id="ip" class="form-control" placeholder="192.168.x.x">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label text-danger">Subscription ID</label>
-                            <input type="text" id="subId" class="form-control" placeholder="GUID">
-                        </div>
-                        <div class="col-md-12">
-                            <label class="form-label text-danger">Eigenaar (Contact)</label>
-                            <input type="text" id="owner" class="form-control" placeholder="email@bedrijf.nl">
-                        </div>
+                            <div class="col-12"><hr></div>
+                            
+                            <div class="col-md-6">
+                                <label class="form-label">Abonnement</label>
+                                <select id="subSelect" class="form-select">
+                                    <option value="">Laden...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-danger">Eigenaar (Contact)</label>
+                                <input type="text" id="owner" class="form-control">
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label text-danger">IP Adres</label>
+                                <input type="text" id="ip" class="form-control">
+                            </div>
 
-                        <div class="col-12"><hr class="text-muted"></div>
-                        <div class="col-md-6">
-                            <label class="form-label">Classificatie</label>
-                            <select id="classif" class="form-select">
-                                <option value="Public">Public (Groen)</option>
-                                <option value="Internal">Internal (Geel)</option>
-                                <option value="Confidential">Confidential (Rood)</option>
-                                <option value="Secret">Secret (Zwart)</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Data Gevoeligheid</label>
-                            <select id="sens" class="form-select">
-                                <option value="None">Geen</option>
-                                <option value="PII">PII (Persoonsgegevens)</option>
-                                <option value="PHI">PHI (Medisch)</option>
-                                <option value="PCI">PCI (Creditcard)</option>
-                            </select>
+                            <div class="col-12"><hr></div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Classificatie</label>
+                                <select id="classif" class="form-select">
+                                    <option value="Public">Public</option><option value="Internal">Internal</option>
+                                    <option value="Confidential">Confidential</option><option value="Secret">Secret</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Data Gevoeligheid (Selecteer meerdere)</label>
+                                <div class="d-flex gap-3 flex-wrap">
+                                    <div class="form-check"><input class="form-check-input sens-check" type="checkbox" value="PII" id="c1"><label class="form-check-label" for="c1">PII</label></div>
+                                    <div class="form-check"><input class="form-check-input sens-check" type="checkbox" value="PHI" id="c2"><label class="form-check-label" for="c2">PHI</label></div>
+                                    <div class="form-check"><input class="form-check-input sens-check" type="checkbox" value="PCI" id="c3"><label class="form-check-label" for="c3">PCI</label></div>
+                                    <div class="form-check"><input class="form-check-input sens-check" type="checkbox" value="Intellectual Property" id="c4"><label class="form-check-label" for="c4">IP</label></div>
+                                </div>
+                            </div>
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuleren</button>
-                    <button type="button" class="btn btn-success" onclick="submitAsset()">Opslaan & Versleutelen</button>
+                    <button type="button" class="btn btn-success" onclick="saveAsset()">Opslaan</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="historyModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header"><h5>Geschiedenis</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body p-0">
+                    <table class="table table-sm table-striped mb-0">
+                        <thead><tr><th>Tijd</th><th>Wie</th><th>Actie</th></tr></thead>
+                        <tbody id="historyTable"></tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -121,124 +140,178 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        let allAssets = [];
+
+        // INIT
+        loadSubs();
         loadAssets();
 
-        // 1. Assets ophalen en tonen
+        // 1. DATA LADEN
         async function loadAssets() {
-            try {
-                const res = await fetch('/api/assets');
-                
-                // BELANGRIJK: Als sessie verlopen is -> Terug naar login
-                if (res.status === 401) {
-                    alert("Sessie verlopen. Log opnieuw in.");
-                    window.location.href = '/login.html';
-                    return;
-                }
-
-                if(!res.ok) {
-                    const tbody = document.getElementById('assetTable');
-                    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger p-4">Fout bij laden: ${res.statusText}</td></tr>`;
-                    return;
-                }
-
-                const assets = await res.json();
-                const tbody = document.getElementById('assetTable');
-                tbody.innerHTML = '';
-
-                if (assets.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center p-4">Nog geen assets gevonden. Klik op "Toevoegen".</td></tr>';
-                    return;
-                }
-
-                assets.forEach(a => {
-                    // Bepaal kleurklasse
-                    let rowClass = 'public';
-                    if(a.classification === 'Internal') rowClass = 'internal';
-                    if(a.classification === 'Confidential') rowClass = 'confidential';
-                    if(a.classification === 'Secret') rowClass = 'secret';
-
-                    // Kleur CIS score
-                    let cisColor = 'text-success';
-                    if(a.cis_score < 70) cisColor = 'text-warning';
-                    if(a.cis_score < 50) cisColor = 'text-danger fw-bold';
-
-                    const row = `
-                        <tr class="${rowClass}">
-                            <td>
-                                <strong>${a.name}</strong><br>
-                                <span class="text-muted small">${a.type}</span>
-                            </td>
-                            <td>
-                                <span class="badge bg-light text-dark border">Data: ${a.data_sensitivity}</span>
-                            </td>
-                            <td>
-                                CIS: <span class="${cisColor}">${a.cis_score || 0}%</span>
-                            </td>
-                            <td>${a.classification}</td>
-                            <td class="small text-muted">
-                                <div><i class="bi bi-globe"></i> ${a.ip_address || '-'}</div>
-                                <div><i class="bi bi-key"></i> ${a.subscription_id || '-'}</div>
-                                <div><i class="bi bi-person"></i> ${a.owner_contact || '-'}</div>
-                            </td>
-                            <td>
-                                <button class="btn btn-sm btn-outline-danger" onclick="deleteAsset(${a.id})">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </td>
-                        </tr>
-                    `;
-                    tbody.innerHTML += row;
-                });
-            } catch(e) { console.error(e); }
+            const res = await fetch('/api/assets');
+            if(res.status === 401) window.location.href = '/login.html';
+            allAssets = await res.json();
+            renderTable(allAssets);
         }
 
-        // 2. Nieuwe Asset Opslaan
-        async function submitAsset() {
+        async function loadSubs() {
+            const res = await fetch('/api/subscriptions');
+            const subs = await res.json();
+            const sel = document.getElementById('subSelect');
+            sel.innerHTML = '<option value="">Kies Subscriptie...</option>';
+            subs.forEach(s => {
+                sel.innerHTML += `<option value="${s.name} (${s.guid})">${s.name} - ${s.responsibles}</option>`;
+            });
+        }
+
+        // 2. RENDERING
+        function renderTable(data) {
+            const tbody = document.getElementById('assetTable');
+            tbody.innerHTML = '';
+            
+            data.forEach(a => {
+                // Kleurtjes logica
+                let borderClass = 'public';
+                if(a.classification === 'Internal') borderClass = 'internal';
+                if(a.classification === 'Confidential') borderClass = 'confidential';
+                if(a.classification === 'Secret') borderClass = 'secret';
+
+                let cisColor = 'text-success';
+                if(a.cis_score < 70) cisColor = 'text-warning';
+                if(a.cis_score < 50) cisColor = 'text-danger fw-bold';
+
+                // Data labels zijn nu komma gescheiden string, maak er badges van
+                const labels = a.data_sensitivity ? a.data_sensitivity.split(',').map(l => `<span class="badge bg-secondary me-1">${l.trim()}</span>`).join('') : '-';
+
+                tbody.innerHTML += `
+                    <tr class="${borderClass}">
+                        <td><strong>${a.name}</strong><br><small class="text-muted">${a.type}</small></td>
+                        <td>${labels}</td>
+                        <td><span class="${cisColor}">${a.cis_score || 0}%</span></td>
+                        <td>${a.classification}</td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-eye text-primary" style="cursor:pointer" onclick="toggleSecret(this)"></i>
+                                <div class="masked-data text-muted small">
+                                    <div>IP: ${a.ip_address}</div>
+                                    <div>Sub: ${a.subscription_id}</div>
+                                    <div>Own: ${a.owner_contact}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="showHistory(${a.id})"><i class="bi bi-clock-history"></i></button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="editAsset(${a.id})"><i class="bi bi-pencil"></i></button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteAsset(${a.id})"><i class="bi bi-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // 3. ACTIES
+        function toggleSecret(icon) {
+            const div = icon.nextElementSibling;
+            div.classList.toggle('revealed');
+            icon.classList.toggle('bi-eye');
+            icon.classList.toggle('bi-eye-slash');
+        }
+
+        function filterTable() {
+            const term = document.getElementById('searchBar').value.toLowerCase();
+            const filtered = allAssets.filter(a => 
+                a.name.toLowerCase().includes(term) || 
+                a.ip_address.toLowerCase().includes(term) ||
+                a.subscription_id.toLowerCase().includes(term)
+            );
+            renderTable(filtered);
+        }
+
+        // OPEN MODAL (NIEUW of EDIT)
+        function openModal() {
+            document.getElementById('assetForm').reset();
+            document.getElementById('assetId').value = ''; 
+            document.getElementById('modalTitle').innerText = 'Nieuwe Asset';
+            // Uncheck boxes
+            document.querySelectorAll('.sens-check').forEach(c => c.checked = false);
+            new bootstrap.Modal(document.getElementById('assetModal')).show();
+        }
+
+        function editAsset(id) {
+            const asset = allAssets.find(a => a.id === id);
+            document.getElementById('assetId').value = asset.id;
+            document.getElementById('name').value = asset.name;
+            document.getElementById('type').value = asset.type;
+            document.getElementById('cis').value = asset.cis_score;
+            document.getElementById('ip').value = asset.ip_address;
+            document.getElementById('subSelect').value = asset.subscription_id; 
+            document.getElementById('owner').value = asset.owner_contact;
+            document.getElementById('classif').value = asset.classification;
+            
+            // Checkboxes zetten
+            const currentSens = asset.data_sensitivity || '';
+            document.querySelectorAll('.sens-check').forEach(c => {
+                c.checked = currentSens.includes(c.value);
+            });
+
+            document.getElementById('modalTitle').innerText = 'Asset Bewerken';
+            new bootstrap.Modal(document.getElementById('assetModal')).show();
+        }
+
+        async function saveAsset() {
+            const id = document.getElementById('assetId').value;
+            
+            // Verzamel aangevinkte labels
+            const selectedSens = [];
+            document.querySelectorAll('.sens-check:checked').forEach(c => selectedSens.push(c.value));
+
             const data = {
+                id: id ? id : null, // ID meesturen voor update
                 name: document.getElementById('name').value,
                 type: document.getElementById('type').value,
                 cis_score: document.getElementById('cis').value,
                 ip_address: document.getElementById('ip').value,
-                subscription_id: document.getElementById('subId').value,
+                subscription_id: document.getElementById('subSelect').value, // Dit pakt nu de waarde uit de dropdown
                 owner_contact: document.getElementById('owner').value,
                 classification: document.getElementById('classif').value,
-                data_sensitivity: document.getElementById('sens').value
+                data_sensitivity: selectedSens // Array
             };
 
-            if(!data.name) { alert("Vul minimaal een naam in."); return; }
-
+            const method = id ? 'PUT' : 'POST'; // Switch tussen Create en Update
+            
             const res = await fetch('/api/assets', {
-                method: 'POST',
+                method: method,
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data)
             });
 
             if(res.ok) {
-                // Sluit de modal netjes
-                const modalEl = document.getElementById('newAssetModal');
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                modal.hide();
-                
-                // Formulier leegmaken en lijst verversen
-                document.getElementById('assetForm').reset();
+                bootstrap.Modal.getInstance(document.getElementById('assetModal')).hide();
                 loadAssets();
             } else {
-                alert("Fout bij opslaan: " + await res.text());
+                alert("Fout: " + await res.text());
             }
         }
 
-        // 3. Verwijderen
         async function deleteAsset(id) {
-            if(!confirm("Weet je zeker dat je deze asset wilt verwijderen?")) return;
-            
-            const res = await fetch('/api/assets', { 
-                method: 'DELETE', 
-                headers: {'Content-Type': 'application/json'}, 
-                body: JSON.stringify({id}) 
-            });
+            if(confirm("Verwijderen?")) {
+                await fetch('/api/assets', { method: 'DELETE', body: JSON.stringify({id}) });
+                loadAssets();
+            }
+        }
 
-            if(res.ok) loadAssets();
-            else alert("Kon niet verwijderen.");
+        async function showHistory(id) {
+            const res = await fetch('/api/assets?history=' + id);
+            const hist = await res.json();
+            const tbody = document.getElementById('historyTable');
+            tbody.innerHTML = '';
+            if(hist.length === 0) tbody.innerHTML = '<tr><td colspan="3">Geen geschiedenis.</td></tr>';
+            
+            hist.forEach(h => {
+                const date = new Date(h.timestamp).toLocaleString();
+                tbody.innerHTML += `<tr><td><small>${date}</small></td><td>${h.changed_by}</td><td>${h.change_type}</td></tr>`;
+            });
+            new bootstrap.Modal(document.getElementById('historyModal')).show();
         }
     </script>
 </body>
