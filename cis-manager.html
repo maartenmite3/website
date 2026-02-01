@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <title>CIS Benchmarks</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+        <div class="container">
+            <span class="navbar-brand">CIS Manager</span>
+            <div class="d-flex gap-3">
+                <a href="/assets.html" class="nav-link text-white">Assets</a>
+                <a href="/" class="btn btn-outline-light btn-sm">Dashboard</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">Nieuwe Benchmark Uploaden</div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Naam (bijv. Server 2025)</label>
+                            <input type="text" id="benchName" class="form-control" placeholder="Windows Server 2025">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">CSV Bestand</label>
+                            <input type="file" id="csvFile" class="form-control" accept=".csv">
+                            <div class="form-text small">Upload de 'Combined Profiles' CSV.</div>
+                        </div>
+                        <button class="btn btn-success w-100" onclick="processUpload()">Uploaden</button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="card shadow-sm">
+                    <div class="card-header">Beschikbare Benchmarks</div>
+                    <div class="card-body p-0">
+                        <table class="table table-hover mb-0">
+                            <thead><tr><th>Naam</th><th>Geupload op</th></tr></thead>
+                            <tbody id="benchTable"><tr><td colspan="2" class="p-3">Laden...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        loadBenchmarks();
+
+        async function loadBenchmarks() {
+            const res = await fetch('/api/cis-catalog?mode=list');
+            const data = await res.json();
+            document.getElementById('benchTable').innerHTML = data.map(b => `
+                <tr><td>${b.name}</td><td>${new Date(b.uploaded_at).toLocaleDateString()}</td></tr>
+            `).join('');
+        }
+
+        function processUpload() {
+            const file = document.getElementById('csvFile').files[0];
+            const name = document.getElementById('benchName').value;
+            if(!file || !name) return alert("Vul naam in en kies bestand.");
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const text = e.target.result;
+                const rows = csvToJSON(text);
+                
+                if(rows.length === 0) return alert("Geen geldige regels gevonden.");
+
+                const btn = document.querySelector('button');
+                btn.disabled = true; btn.innerText = "Bezig met opslaan...";
+
+                const res = await fetch('/api/cis-catalog', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ name: name, rows: rows })
+                });
+
+                if(res.ok) { alert("Opgeslagen!"); loadBenchmarks(); } 
+                else { alert("Fout bij opslaan"); }
+                btn.disabled = false; btn.innerText = "Uploaden";
+            };
+            reader.readAsText(file);
+        }
+
+        function csvToJSON(csv) {
+            // Simpele parser afgestemd op CIS CSV formaat
+            const lines = csv.split(/\r?\n/);
+            const result = [];
+            // Zoek indexen van headers
+            const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+            
+            // CIS CSV heeft vaak: "Recommendation #", "Title", "Profile", "Description"
+            const idxID = headers.findIndex(h => h.includes('Recommendation #'));
+            const idxTitle = headers.findIndex(h => h.includes('Title'));
+            const idxProf = headers.findIndex(h => h.includes('Profile'));
+            const idxDesc = headers.findIndex(h => h.includes('Description'));
+
+            if(idxID === -1 || idxTitle === -1) {
+                alert("CSV formaat niet herkend. Zorg voor 'Recommendation #' en 'Title' kolommen.");
+                return [];
+            }
+
+            for(let i=1; i<lines.length; i++) {
+                if(!lines[i].trim()) continue;
+                // Let op: simpele split op komma werkt niet goed bij tekst met komma's.
+                // Voor nu, simpele regex split (beter is een library als PapaParse, maar we houden het dependency-vrij)
+                const row = parseCSVLine(lines[i]);
+                if(row.length < headers.length) continue;
+
+                result.push({
+                    id: row[idxID],
+                    title: row[idxTitle],
+                    profile: idxProf > -1 ? row[idxProf] : 'General',
+                    desc: idxDesc > -1 ? row[idxDesc] : ''
+                });
+            }
+            return result;
+        }
+
+        // Helper voor CSV met quotes
+        function parseCSVLine(text) {
+            let re_valid = /^\s*(?:'[^'\\]*(?:\\[\S\s][^'\\]*)*'|"[^"\\]*(?:\\[\S\s][^"\\]*)*"|[^,'"\s\\]*(?:\s+[^,'"\s\\]+)*)\s*(?:,\s*(?:'[^'\\]*(?:\\[\S\s][^'\\]*)*'|"[^"\\]*(?:\\[\S\s][^"\\]*)*"|[^,'"\s\\]*(?:\s+[^,'"\s\\]+)*)\s*)*$/;
+            let re_value = /(?!\s*$)\s*(?:'([^'\\]*(?:\\[\S\s][^'\\]*)*)'|"([^"\\]*(?:\\[\S\s][^"\\]*)*)"|([^,'"\s\\]*(?:\s+[^,'"\s\\]+)*))\s*(?:,|$)/g;
+            let a = [];
+            text.replace(re_value, function(m0, m1, m2, m3) {
+                if (m1 !== undefined) a.push(m1.replace(/\\'/g, "'"));
+                else if (m2 !== undefined) a.push(m2.replace(/\\"/g, '"'));
+                else if (m3 !== undefined) a.push(m3);
+                return '';
+            });
+            if (/,\s*$/.test(text)) a.push('');
+            return a;
+        }
+    </script>
+</body>
+</html>
