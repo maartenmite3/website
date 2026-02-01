@@ -15,8 +15,6 @@
         .masked-data { filter: blur(5px); cursor: pointer; transition: 0.2s; user-select: none; display: inline-block; }
         .masked-data:hover, .masked-data.revealed { filter: none; }
         .clickable-asset { cursor: pointer; color: #0d6efd; font-weight: bold; text-decoration: underline; }
-        
-        /* Netwerk Grafiek Stijl */
         #networkGraph { width: 100%; height: 600px; border: 1px solid #ddd; background-color: #f8f9fa; }
         .asset-icon-img { width: 24px; height: 24px; vertical-align: middle; margin-right: 10px; }
         .pagination { margin-top: 1rem; margin-bottom: 2rem; }
@@ -130,7 +128,7 @@
                         <div class="tab-pane fade" id="tabRel">
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <div class="alert alert-info py-2 small mb-0 flex-grow-1 me-3">Koppel assets om afhankelijkheden in kaart te brengen.</div>
-                                <button class="btn btn-primary shadow-sm" onclick="openNetworkModal()"><i class="bi bi-diagram-3-fill"></i> Toon Netwerk</button>
+                                <button class="btn btn-primary shadow-sm" onclick="openNetworkModal()"><i class="bi bi-diagram-3-fill"></i> Toon Netwerk (Threat Model)</button>
                             </div>
                             <form id="relForm" class="row g-2 mb-3 bg-light p-2 border rounded align-items-center">
                                 <div class="col-auto">Deze asset...</div>
@@ -152,21 +150,30 @@
         <div class="modal-dialog modal-xl modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header bg-dark text-white">
-                    <h5 class="modal-title"><i class="bi bi-diagram-2"></i> Netwerk Overzicht</h5>
+                    <h5 class="modal-title"><i class="bi bi-diagram-2"></i> Threat Model & Netwerk</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-0 position-relative">
                     <div id="networkGraph"></div>
+                    
                     <div class="position-absolute top-0 end-0 m-3 d-flex gap-2">
-                        <button class="btn btn-light shadow-sm border btn-sm" onclick="togglePhysics()" id="physBtn" title="Zet 'veren' aan/uit om te organiseren">
+                        <button class="btn btn-light shadow-sm border btn-sm" onclick="togglePhysics()" id="physBtn" title="Zet 'veren' aan/uit">
                             <i class="bi bi-play-fill"></i> Organiseren
                         </button>
+                        <button class="btn btn-primary shadow-sm border btn-sm" onclick="saveLayout()">
+                            <i class="bi bi-save"></i> Layout Opslaan
+                        </button>
                         <button class="btn btn-light shadow-sm border btn-sm" onclick="exportNetworkImage()">
-                            <i class="bi bi-camera"></i> Opslaan
+                            <i class="bi bi-camera"></i> Foto
                         </button>
                     </div>
-                    <div class="position-absolute bottom-0 start-0 m-3 small text-muted bg-white p-1 rounded border">
-                        <i class="bi bi-info-circle"></i> Tip: Sleep iconen bij elkaar om groepjes te maken. Ze blijven staan.
+
+                    <div class="position-absolute bottom-0 start-0 m-3 small bg-white p-2 rounded border shadow-sm">
+                        <div id="threatAlert" class="text-danger fw-bold mb-1 d-none"><i class="bi bi-exclamation-triangle"></i> Cross-Subscription Detected!</div>
+                        <div><span style="color:#0d6efd">●</span> Huidige Asset</div>
+                        <div><span style="color:#ffc107">●</span> Downstream</div>
+                        <div><span style="color:#198754">●</span> Upstream</div>
+                        <div class="mt-1 border-top pt-1"><span style="border-bottom: 2px dashed red;">---</span> Cross-Sub Verbinding</div>
                     </div>
                 </div>
             </div>
@@ -192,7 +199,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        let allAssets = []; let allSubs = []; let currentAssetId = null; let currentRelationships = null;
+        let allAssets = []; let allSubs = []; let currentAssetId = null; 
+        let currentRelationships = null; let currentLayout = null;
         let isGlobalRevealed = false; let importData = { new: [] }; let searchTimeout = null; let networkInstance = null;
         let currentPage = 1; let totalPages = 1;
 
@@ -270,7 +278,7 @@
         function changeLimit() { loadAssets(1); }
         function toggleGlobalReveal() { isGlobalRevealed = !isGlobalRevealed; const btn = document.getElementById('globalEyeBtn'); const icon = btn.querySelector('i'); if (isGlobalRevealed) { btn.className='btn btn-warning'; icon.className='bi bi-eye-slash'; } else { btn.className='btn btn-outline-secondary'; icon.className='bi bi-eye'; } document.querySelectorAll('.masked-data').forEach(el => el.classList.toggle('revealed', isGlobalRevealed)); }
 
-        // --- NETWORK GRAPH (UPDATED) ---
+        // --- NETWORK GRAPH (THREAT MODELING & SAVED LAYOUT) ---
         function openNetworkModal() {
             if(!currentRelationships) return alert("Geen data");
             new bootstrap.Modal(document.getElementById('networkModal')).show();
@@ -281,58 +289,131 @@
             const nodes = []; const edges = [];
             const currentName = document.getElementById('detailTitle').innerText.replace('Details voor: ', '');
             
-            // Centraal
-            const currentAsset = allAssets.find(a => a.id == currentAssetId) || { name: currentName, type: '' };
+            // Haal de centrale asset op uit de geladen set
+            const currentAsset = allAssets.find(a => a.id == currentAssetId) || { name: currentName, type: '', subscription_id: 'unknown' };
+            const currentSub = currentAsset.subscription_id;
             const currentImg = getAssetImage(currentName, currentAsset.type);
-            nodes.push({ id: currentAssetId, label: currentName, shape: 'image', image: currentImg, size: 40, font: { color: '#000', multi: true, bold: true } });
+
+            // Centraal Node
+            // Check of we opgeslagen positie hebben
+            let pos = { x: undefined, y: undefined };
+            if (currentLayout && currentLayout[currentAssetId]) pos = currentLayout[currentAssetId];
+
+            nodes.push({ 
+                id: currentAssetId, 
+                label: currentName, 
+                shape: 'image', 
+                image: currentImg, 
+                size: 40, 
+                font: { color: '#000', multi: true, bold: true },
+                x: pos.x, y: pos.y
+            });
             
-            currentRelationships.downstream.forEach(r => {
-                const img = getAssetImage(r.name, '');
-                nodes.push({ id: r.linked_asset_id, label: r.name, shape: 'image', image: img });
-                edges.push({ from: currentAssetId, to: r.linked_asset_id, label: r.relation_type, arrows: 'to' });
-            });
-            currentRelationships.upstream.forEach(r => {
+            let threatFound = false;
+
+            // Helper om node en edge toe te voegen met Zero Trust Check
+            const addLinkedNode = (r, color) => {
+                const img = getAssetImage(r.name, r.type);
+                let nodePos = { x: undefined, y: undefined };
+                if (currentLayout && currentLayout[r.linked_asset_id]) nodePos = currentLayout[r.linked_asset_id];
+
+                // ZERO TRUST CHECK: Is Subscriptie anders?
+                const isCrossSub = r.enc_sub_id !== currentSub && r.enc_sub_id !== 'unknown' && currentSub !== 'unknown';
+                if (isCrossSub) threatFound = true;
+
+                // Node eigenschappen bij Threat
+                const borderWidth = isCrossSub ? 4 : 1;
+                const borderColor = isCrossSub ? '#dc3545' : '#ccc'; // Rood of Grijs
+
+                // Edge eigenschappen bij Threat
+                const edgeColor = isCrossSub ? '#dc3545' : '#848484';
+                const dashes = isCrossSub; // Gestreept bij threat
+
+                // Voeg node toe als hij nog niet bestaat
                 if(!nodes.find(n => n.id === r.linked_asset_id)) {
-                    const img = getAssetImage(r.name, '');
-                    nodes.push({ id: r.linked_asset_id, label: r.name, shape: 'image', image: img });
+                    nodes.push({ 
+                        id: r.linked_asset_id, 
+                        label: r.name, 
+                        shape: 'image', 
+                        image: img,
+                        shapeProperties: { useBorderWithImage: true },
+                        borderWidth: borderWidth,
+                        color: { border: borderColor, background: '#fff' },
+                        x: nodePos.x, y: nodePos.y
+                    });
                 }
-                edges.push({ from: r.linked_asset_id, to: currentAssetId, label: r.relation_type, arrows: 'to' });
-            });
+                
+                // Voeg edge toe
+                edges.push({ 
+                    from: currentAssetId, 
+                    to: r.linked_asset_id, 
+                    label: r.relation_type, 
+                    arrows: 'to',
+                    color: { color: edgeColor },
+                    dashes: dashes,
+                    width: isCrossSub ? 2 : 1
+                });
+            };
+
+            currentRelationships.downstream.forEach(r => addLinkedNode(r, '#ffc107'));
+            currentRelationships.upstream.forEach(r => addLinkedNode(r, '#198754'));
+
+            // Toon warning als er threats zijn
+            const alertBox = document.getElementById('threatAlert');
+            if (threatFound) alertBox.classList.remove('d-none');
+            else alertBox.classList.add('d-none');
 
             const container = document.getElementById('networkGraph');
             const data = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
             
-            // PHYSICS OPTIES: AAN BIJ START, DAN UIT
+            // Als we layout hebben, physics UIT zetten om stuiteren te voorkomen
+            const hasLayout = currentLayout !== null;
+
             const options = { 
                 physics: { 
-                    enabled: true, 
-                    stabilization: { iterations: 1000 }, // Laat hem even goed uitrekenen
-                    barnesHut: { gravitationalConstant: -3000 } // Zorg voor spreiding
+                    enabled: !hasLayout, // Alleen aan als we geen opgeslagen layout hebben
+                    stabilization: { iterations: 1000 }, 
+                    barnesHut: { gravitationalConstant: -3000 }
                 }, 
                 layout: { randomSeed: 2 }, 
                 interaction: { zoomView: true, dragView: true },
-                nodes: { borderWidth: 1, color: { border: '#ccc', background: '#fff' } }
+                nodes: { borderWidth: 1, borderWidthSelected: 2 }
             };
             
             networkInstance = new vis.Network(container, data, options);
 
-            // CRUCIAAL: Zet physics UIT zodra hij stabiel is, zodat items niet terugspringen
-            networkInstance.on("stabilizationIterationsDone", function () {
-                networkInstance.setOptions( { physics: false } );
-            });
+            // Zodra gestabiliseerd, zet physics uit zodat je kunt slepen zonder terugveren
+            if (!hasLayout) {
+                networkInstance.on("stabilizationIterationsDone", function () {
+                    networkInstance.setOptions( { physics: false } );
+                });
+            }
             
-            // Voor de zekerheid bij slepen ook physics uit
+            // Altijd physics uit bij slepen
             networkInstance.on("dragStart", function (params) {
                 networkInstance.setOptions( { physics: false } );
             });
         }
 
-        // Knop om physics weer even aan te zetten
+        async function saveLayout() {
+            if(!networkInstance) return;
+            // Haal posities op
+            const positions = networkInstance.getPositions();
+            // Stuur naar API
+            await fetch('/api/asset-details', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ type: 'layout', asset_id: currentAssetId, positions: positions })
+            });
+            alert("Layout opgeslagen!");
+            // Update lokale state zodat we bij volgende keer openen direct goed zitten
+            currentLayout = positions;
+        }
+
         function togglePhysics() {
             if(!networkInstance) return;
             const current = networkInstance.physics.physicsEnabled;
             networkInstance.setOptions({ physics: !current });
-            // Icon update
             const btn = document.getElementById('physBtn');
             btn.innerHTML = !current ? '<i class="bi bi-pause-fill"></i> Stop Organiseren' : '<i class="bi bi-play-fill"></i> Organiseren';
         }
@@ -343,37 +424,52 @@
             const link = document.createElement('a'); link.download = `network_map_${currentAssetId}.png`; link.href = canvas.toDataURL(); link.click();
         }
 
-        // --- DETAILS ---
+        // --- DETAILS / RELATIES ---
         async function openDetailModal(id, name) {
             currentAssetId = id; document.getElementById('detailTitle').innerText = `Details voor: ${name}`;
             try {
                 const res = await fetch(`/api/asset-details?id=${id}`); const data = await res.json();
                 currentRelationships = data.relationships;
+                currentLayout = data.layout; // Layout laden
+
                 const vT = document.getElementById('vulnTable'); vT.innerHTML=''; data.vulnerabilities.forEach(v => vT.innerHTML+=`<tr><td>${v.name}</td><td>${v.severity}</td><td>${v.status}</td><td>${v.due_date||'-'}</td><td><i class="bi bi-trash text-danger" onclick="deleteDetail('vuln',${v.id})"></i></td></tr>`);
                 const cT = document.getElementById('cisTable'); cT.innerHTML=''; data.cis.forEach(c => cT.innerHTML+=`<tr><td>${c.control_id}</td><td>${c.description}</td><td>${c.justification}</td><td><i class="bi bi-trash text-danger" onclick="deleteDetail('cis',${c.id})"></i></td></tr>`);
                 const hT = document.getElementById('histTable'); hT.innerHTML=''; data.history.forEach(h => hT.innerHTML+=`<tr><td>${new Date(h.timestamp).toLocaleString()}</td><td>${h.changed_by}</td><td>${h.change_type}</td></tr>`);
+                
                 await loadAssetDropdown();
                 const rdT = document.getElementById('relDownTable'); rdT.innerHTML = ''; data.relationships.downstream.forEach(r => rdT.innerHTML += `<tr><td>${r.relation_type} <span class="fw-bold">${r.name}</span></td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
                 const ruT = document.getElementById('relUpTable'); ruT.innerHTML = ''; data.relationships.upstream.forEach(r => ruT.innerHTML += `<tr><td><span class="fw-bold">${r.name}</span> ${r.relation_type} deze asset</td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
+                
                 new bootstrap.Modal(document.getElementById('detailModal')).show();
             } catch(e) { console.error(e); alert("Details fout"); }
         }
-        async function loadAssetDropdown() { const res = await fetch('/api/asset-details?type=list'); const list = await res.json(); const sel = document.getElementById('rTarget'); sel.innerHTML = '<option value="">Selecteer asset...</option>'; list.forEach(item => { if(item.id !== currentAssetId) sel.innerHTML += `<option value="${item.id}">${item.name}</option>`; }); }
+
+        async function loadAssetDropdown() {
+            const res = await fetch('/api/asset-details?type=list'); const list = await res.json();
+            const sel = document.getElementById('rTarget'); sel.innerHTML = '<option value="">Selecteer asset...</option>';
+            list.forEach(item => { if(item.id !== currentAssetId) sel.innerHTML += `<option value="${item.id}">${item.name}</option>`; });
+        }
         async function addRel() { const targetId = document.getElementById('rTarget').value; const type = document.getElementById('rType').value; if(!targetId) return alert("Kies een asset"); await fetch('/api/asset-details', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ type: 'rel', parent_id: currentAssetId, child_id: targetId, relation_type: type }) }); const name = document.getElementById('detailTitle').innerText.replace('Details voor: ', ''); openDetailModal(currentAssetId, name); }
         async function deleteDetail(type, id) { if(!confirm("Verwijderen?")) return; await fetch('/api/asset-details', { method: 'DELETE', body: JSON.stringify({type, id}) }); const name = document.getElementById('detailTitle').innerText.replace('Details voor: ', ''); openDetailModal(currentAssetId, name); if(type !== 'rel') loadAssets(currentPage); }
         async function addVuln() { const body = { type: 'vuln', asset_id: currentAssetId, name: document.getElementById('vName').value, severity: document.getElementById('vSev').value, status: document.getElementById('vStat').value, due_date: document.getElementById('vDate').value }; await fetch('/api/asset-details', { method: 'POST', body: JSON.stringify(body) }); document.getElementById('vulnForm').reset(); openDetailModal(currentAssetId, document.getElementById('detailTitle').innerText.replace('Details voor: ', '')); loadAssets(currentPage); }
         async function addCis() { const body = { type: 'cis', asset_id: currentAssetId, control_id: document.getElementById('cId').value, description: document.getElementById('cDesc').value, justification: document.getElementById('cJust').value }; await fetch('/api/asset-details', { method: 'POST', body: JSON.stringify(body) }); document.getElementById('cisForm').reset(); openDetailModal(currentAssetId, document.getElementById('detailTitle').innerText.replace('Details voor: ', '')); }
 
-        // --- CRUD / EXPORT / IMPORT ---
+        // --- ASSET CRUD / IMPORT ---
         function openCreateModal() { document.getElementById('assetForm').reset(); document.getElementById('assetId').value = ''; document.getElementById('modalTitle').innerText='Nieuwe Asset'; new bootstrap.Modal(document.getElementById('assetModal')).show(); }
         function openEditModal(id) { const a = allAssets.find(x => x.id === id); document.getElementById('assetId').value=id; document.getElementById('name').value=a.name; document.getElementById('type').value=a.type; document.getElementById('cis').value=a.cis_score; document.getElementById('subSelect').value=a.subscription_id; document.getElementById('owner').value=a.owner_contact; document.getElementById('ip').value=(a.ips||[a.ip_address]).join(', '); document.getElementById('classif').value=a.classification; document.querySelectorAll('.sens-check').forEach(c => c.checked=(a.data_sensitivity||'').includes(c.value)); document.getElementById('modalTitle').innerText='Bewerken'; new bootstrap.Modal(document.getElementById('assetModal')).show(); }
         async function saveAsset() { const id = document.getElementById('assetId').value; const sens=[]; document.querySelectorAll('.sens-check:checked').forEach(c=>sens.push(c.value)); const body = { id:id?id:null, name:document.getElementById('name').value, type:document.getElementById('type').value, cis_score:document.getElementById('cis').value, subscription_id:document.getElementById('subSelect').value, owner_contact:document.getElementById('owner').value, ip_address:document.getElementById('ip').value, classification:document.getElementById('classif').value, data_sensitivity:sens }; const r = await fetch('/api/assets', {method:id?'PUT':'POST', body:JSON.stringify(body)}); if(r.ok) { bootstrap.Modal.getInstance(document.getElementById('assetModal')).hide(); loadAssets(currentPage); } else alert(await r.text()); }
         async function deleteAsset(id) { if(confirm('Wissen?')) { await fetch('/api/assets', {method:'DELETE', body:JSON.stringify({id})}); loadAssets(currentPage); } }
-        async function exportCSV() { const res = await fetch('/api/assets?limit=all'); if(!res.ok) return alert('Fout'); const json = await res.json(); const data = json.data; if(!data.length) return alert("Geen data."); const headers = ["ID", "Naam", "Type", "IP Adressen", "Subscriptie", "Eigenaar", "CIS Score", "Classificatie", "Gevoeligheid", "Vuln Count"]; let csv = headers.join(",") + "\n"; data.forEach(a => { const subObj = allSubs.find(s => s.guid === a.subscription_id); const subName = subObj ? subObj.name : a.subscription_id; const ips = (a.ips && a.ips.length > 0) ? a.ips.join(";") : a.ip_address; const row = [a.id, `"${a.name}"`, `"${a.type}"`, `"${ips}"`, `"${subName}"`, `"${a.owner_contact}"`, a.cis_score||0, a.classification, `"${(a.data_sensitivity||'').replace(/,/g,';')}"`, a.vuln_count]; csv += row.join(",") + "\n"; }); const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `assets_export_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(link); link.click(); document.body.removeChild(link); }
         function openImportModal() { document.getElementById('importPreview').classList.add('d-none'); document.getElementById('csvFile').value=''; new bootstrap.Modal(document.getElementById('importModal')).show(); }
         function analyzeCSV() { const file = document.getElementById('csvFile').files[0]; if(!file) return alert('Kies bestand'); const reader = new FileReader(); reader.onload=async(e)=>{ const rows=csvToJSON(e.target.result); if(!rows.length) return alert('Geen data'); const r=await fetch('/api/import-handler', {method:'POST', body:JSON.stringify({mode:'check', type:'assets', data:rows})}); const d=await r.json(); importData.new=d.new; document.getElementById('countNew').innerText=d.new.length; document.getElementById('listNew').innerHTML=d.new.map(i=>`<tr><td>${i.name}</td></tr>`).join(''); document.getElementById('importPreview').classList.remove('d-none'); document.getElementById('btnConfirmImport').disabled=!d.new.length; }; reader.readAsText(file); }
         async function executeImport() { if(!confirm('Start?')) return; const r=await fetch('/api/import-handler', {method:'POST', body:JSON.stringify({mode:'execute', type:'assets', data:importData.new})}); if(r.ok) { alert('Klaar'); bootstrap.Modal.getInstance(document.getElementById('importModal')).hide(); loadAssets(currentPage); } }
         function csvToJSON(csv) { const lines=csv.split(/\r?\n/); if(lines.length<1) return []; const h=lines[0].split(',').map(x=>x.trim().replace(/^"|"$/g,'').replace(/^\uFEFF/,'')); const res=[]; for(let i=1;i<lines.length;i++){ if(!lines[i].trim()) continue; const l=lines[i].split(','); const o={}; for(let j=0;j<h.length;j++) o[h[j]]=l[j]?l[j].trim().replace(/^"|"$/g,''):''; res.push(o); } return res; }
+        
+        function toggleGlobalReveal() {
+            isGlobalRevealed = !isGlobalRevealed;
+            const btn = document.getElementById('globalEyeBtn'); const icon = btn.querySelector('i');
+            if (isGlobalRevealed) { btn.className='btn btn-warning'; icon.className='bi bi-eye-slash'; } else { btn.className='btn btn-outline-secondary'; icon.className='bi bi-eye'; }
+            document.querySelectorAll('.masked-data').forEach(el => el.classList.toggle('revealed', isGlobalRevealed));
+        }
     </script>
 </body>
 </html>
