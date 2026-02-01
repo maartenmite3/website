@@ -6,15 +6,14 @@ export async function onRequestPost(context) {
   if (!user) return new Response('Ongeldig', { status: 401 });
 
   const sessionId = crypto.randomUUID();
-  
-  // LOGICA: Als MFA aanstaat, is de status 'pending_mfa', anders 'active'
   const status = user.mfa_enabled ? 'pending_mfa' : 'active';
+  const now = Date.now();
 
-  await context.env.MY_DB.prepare('INSERT INTO sessions (id, user_id, created_at, status) VALUES (?, ?, ?, ?)')
-    .bind(sessionId, user.id, Date.now(), status)
+  // UPDATE: We voegen 'last_active' toe aan de insert
+  await context.env.MY_DB.prepare('INSERT INTO sessions (id, user_id, created_at, status, last_active) VALUES (?, ?, ?, ?, ?)')
+    .bind(sessionId, user.id, now, status, now)
     .run();
 
-  // We sturen terug of MFA nodig is
   return new Response(JSON.stringify({ mfa_required: user.mfa_enabled === 1 }), {
     headers: {
       'Set-Cookie': `session_id=${sessionId}; Path=/; HttpOnly; SameSite=Strict`,

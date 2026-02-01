@@ -7,7 +7,7 @@ export async function onRequest(context) {
     path === '/login' || 
     path === '/login.html' || 
     path === '/api/login' || 
-    path === '/api/mfa-verify-login' || // NIEUW: Hier checken we de code
+    path === '/api/mfa-verify-login' || 
     path.includes('.')
   ) {
     return context.next();
@@ -19,21 +19,49 @@ export async function onRequest(context) {
 
   if (!sessionKey) return Response.redirect(`${url.origin}/login.html`, 302);
 
-  // 3. CHECK DATABASE & STATUS
+  // 3. HAAL SESSIE OP
   const session = await context.env.MY_DB.prepare('SELECT * FROM sessions WHERE id = ?').bind(sessionKey).first();
   
   if (!session) {
-    // Sessie bestaat niet -> Wegwezen
-    return new Response(null, { status: 302, headers: { 'Location': '/login.html', 'Set-Cookie': 'session_id=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT' }});
+    return logoutAndRedirect(url.origin);
   }
 
-  // NIEUW: Als de sessie wacht op MFA, en we zitten niet op een API, stuur terug naar login
+  // 4. CHECK TIJDSLIMIET (15 Minuten = 900.000 ms)
+  const FIFTEEN_MINUTES = 15 * 60 * 1000;
+  const now = Date.now();
+  
+  // Als last_active leeg is (oude sessies), gebruiken we created_at, of anders 0
+  const lastActive = session.last_active || session.created_at || 0;
+
+  if (now - lastActive > FIFTEEN_MINUTES) {
+    // TE LANG INACTIEF: Verwijder sessie uit DB en stuur naar login
+    await context.env.MY_DB.prepare('DELETE FROM sessions WHERE id = ?').bind(sessionKey).run();
+    return logoutAndRedirect(url.origin);
+  }
+
+  // 5. CHECK MFA STATUS
   if (session.status === 'pending_mfa') {
-     // We sturen een signaal dat de frontend kan oppikken om het 2e scherm te tonen
      return Response.redirect(`${url.origin}/login.html?mfa=needed`, 302);
   }
 
-  // 4. HAAL USER OP
+  // 6. ALLES OK? UPDATE TIJD & DOORGAAN
+  // We updaten de 'last_active' tijd zodat de klok weer op 0 staat
+  // We doen dit "fire and forget" (zonder await) zodat de gebruiker niet hoeft te wachten op de database
+  context.env.MY_DB.prepare('UPDATE sessions SET last_active = ? WHERE id = ?').bind(now, sessionKey).run();
+
+  // Haal user op voor de applicatie
   context.data.user = await context.env.MY_DB.prepare('SELECT * FROM users WHERE id = ?').bind(session.user_id).first();
+  
   return context.next();
+}
+
+// Hulpfunctie om netjes uit te loggen (cookie wissen)
+function logoutAndRedirect(origin) {
+  return new Response(null, {
+    status: 302,
+    headers: {
+      'Location': `${origin}/login.html`,
+      'Set-Cookie': 'session_id=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT' 
+    }
+  });
 }
