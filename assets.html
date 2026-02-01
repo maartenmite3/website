@@ -115,11 +115,19 @@
     <script>
         loadAssets();
 
-        async function loadAssets() {
+     async function loadAssets() {
             try {
                 const res = await fetch('/api/assets');
+                
+                // NIEUW: Als de server zegt "401 Unauthorized", stuur gebruiker naar login
+                if (res.status === 401) {
+                    alert("Je sessie is verlopen. Log opnieuw in.");
+                    window.location.href = '/login.html';
+                    return;
+                }
+
                 if(!res.ok) {
-                    if(res.status === 500) alert("Server Config Fout: Check of ENCRYPTION_KEY is ingesteld in Cloudflare!");
+                    console.error("Fout bij laden"); 
                     return;
                 }
                 const assets = await res.json();
