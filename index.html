@@ -6,6 +6,7 @@
     <title>Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body class="bg-light">
 
@@ -42,7 +43,7 @@
                 <p class="lead">Je bent succesvol ingelogd in de beveiligde omgeving.</p>
                 <hr>
                 <div class="alert alert-info">
-                    <i class="bi bi-info-circle"></i> Dit is een beveiligde indexpagina. Alleen gebruikers met een geldige sessie in de D1 database kunnen dit zien.
+                    <i class="bi bi-info-circle"></i> Dit is een beveiligde indexpagina.
                 </div>
             </div>
         </div>
@@ -67,8 +68,21 @@
 
                     <h6><i class="bi bi-shield-lock"></i> Multi-Factor Authenticatie</h6>
                     <p class="small text-muted mb-2">Status: <span id="mfaStatus" class="badge bg-secondary">Laden...</span></p>
-                    <button class="btn btn-outline-primary btn-sm w-100" onclick="alert('Voor MFA heb je een QR-code bibliotheek nodig. Dit is een demo.')">
-                        MFA Configureren
+
+                    <div id="mfaSetup" class="d-none border p-3 rounded bg-light mb-2">
+                        <p class="small fw-bold">Scan met Google Authenticator:</p>
+                        <div id="qrcode" class="mb-3 d-flex justify-content-center bg-white p-2 border"></div>
+                        
+                        <label class="small form-label">Vul de code in die je ziet:</label>
+                        <div class="input-group mb-2">
+                            <input type="text" id="setupCode" class="form-control" placeholder="123456" maxlength="6" inputmode="numeric">
+                            <button class="btn btn-success" onclick="confirmMFA()">Activeren</button>
+                        </div>
+                        <input type="hidden" id="tempSecret">
+                    </div>
+
+                    <button id="startMfaBtn" class="btn btn-outline-primary btn-sm w-100" onclick="startMfaSetup()">
+                        MFA Configureren / Resetten
                     </button>
 
                 </div>
@@ -80,9 +94,8 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
     <script>
-        // 1. Data ophalen bij laden
+        // --- 1. GEGEVENS LADEN ---
         fetch('/api/user')
             .then(r => r.json())
             .then(user => {
@@ -99,105 +112,78 @@
             })
             .catch(err => console.error("Kon user niet laden", err));
 
-        // 2. Wachtwoord updaten functie
-async function updatePass() {
-    const passField = document.getElementById('newPass');
-    const newPass = passField.value;
-    
-    if(!newPass) {
-        alert("Vul wel iets in!"); 
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/user', { 
-            method: 'PUT', 
-            headers: { 
-                'Content-Type': 'application/json'  // <--- DEZE REGEL WAS DE BOOSDOENER!
-            },
-            body: JSON.stringify({ new_password: newPass }) 
-        });
-
-        if (response.ok) {
-            alert('Wachtwoord succesvol gewijzigd!');
-            passField.value = ''; 
+        // --- 2. WACHTWOORD UPDATEN ---
+        async function updatePass() {
+            const passField = document.getElementById('newPass');
+            const newPass = passField.value;
             
-            // Sluit de modal
-            const modalEl = document.getElementById('settingsModal');
-            const modal = bootstrap.Modal.getInstance(modalEl);
-            modal.hide();
-        } else {
-            // Lees de foutmelding van de server als die er is
-            const errorText = await response.text();
-            console.error('Server fout:', errorText);
-            alert('Fout bij opslaan: ' + errorText);
+            if(!newPass) { alert("Vul wel iets in!"); return; }
+
+            try {
+                const res = await fetch('/api/user', { 
+                    method: 'PUT', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ new_password: newPass }) 
+                });
+
+                if (res.ok) {
+                    alert('Wachtwoord gewijzigd!');
+                    passField.value = '';
+                } else {
+                    alert('Fout: ' + await res.text());
+                }
+            } catch (e) { alert('Verbindingsfout'); }
         }
 
-    } catch (e) {
-        console.error(e);
-        alert('Er ging iets mis met de verbinding.');
-    }
-}
+        // --- 3. MFA SETUP STARTEN ---
+        async function startMfaSetup() {
+            try {
+                // Haal een nieuwe secret op van de server
+                const res = await fetch('/api/mfa-settings');
+                const data = await res.json();
+                
+                // Toon het setup vakje en verberg de startknop
+                document.getElementById('mfaSetup').classList.remove('d-none');
+                document.getElementById('startMfaBtn').classList.add('d-none');
+                
+                // Sla de secret tijdelijk op (onzichtbaar)
+                document.getElementById('tempSecret').value = data.secret;
+                
+                // Genereer de QR code
+                document.getElementById('qrcode').innerHTML = "";
+                new QRCode(document.getElementById("qrcode"), {
+                    text: data.otpauth_url,
+                    width: 128,
+                    height: 128
+                });
+            } catch (e) {
+                console.error(e);
+                alert("Kon MFA setup niet starten.");
+            }
+        }
+
+        // --- 4. MFA BEVESTIGEN ---
+        async function confirmMFA() {
+            const secret = document.getElementById('tempSecret').value;
+            const token = document.getElementById('setupCode').value;
+
+            if(!token) { alert("Vul de code in!"); return; }
+
+            try {
+                const res = await fetch('/api/mfa-settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ secret, token })
+                });
+
+                if (res.ok) {
+                    alert('Succes! MFA is nu ingeschakeld.');
+                    location.reload(); // Herlaad pagina om status te updaten
+                } else {
+                    alert('Code onjuist, probeer het opnieuw.');
+                }
+            } catch (e) { alert('Verbindingsfout'); }
+        }
     </script>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-
-<h6><i class="bi bi-shield-lock"></i> Multi-Factor Authenticatie</h6>
-<p class="small text-muted mb-2">Status: <span id="mfaStatus" class="badge bg-secondary">Laden...</span></p>
-
-<div id="mfaSetup" class="d-none border p-3 rounded bg-light">
-    <p class="small">Scan deze code met Google Authenticator:</p>
-    <div id="qrcode" class="mb-3 d-flex justify-content-center"></div>
-    <input type="text" id="setupCode" class="form-control mb-2" placeholder="Vul 6-cijferige code in">
-    <button class="btn btn-success btn-sm w-100" onclick="confirmMFA()">Activeren</button>
-    <input type="hidden" id="tempSecret">
-</div>
-
-<button id="startMfaBtn" class="btn btn-outline-primary btn-sm w-100" onclick="startMfaSetup()">
-    MFA Configureren
-</button>
-
-<script>
-    // Bestaande code... (user ophalen etc)
-
-    async function startMfaSetup() {
-        const res = await fetch('/api/mfa-settings');
-        const data = await res.json();
-        
-        document.getElementById('mfaSetup').classList.remove('d-none');
-        document.getElementById('startMfaBtn').classList.add('d-none');
-        document.getElementById('tempSecret').value = data.secret;
-        
-        document.getElementById('qrcode').innerHTML = ""; // Clear
-        new QRCode(document.getElementById("qrcode"), {
-            text: data.otpauth_url,
-            width: 128,
-            height: 128
-        });
-    }
-
-    async function confirmMFA() {
-        const secret = document.getElementById('tempSecret').value;
-        const token = document.getElementById('setupCode').value;
-
-        const res = await fetch('/api/mfa-settings', {
-            method: 'POST',
-            body: JSON.stringify({ secret, token })
-        });
-
-        if (res.ok) {
-            alert('MFA is nu actief! De volgende keer moet je inloggen met een code.');
-            location.reload();
-        } else {
-            alert('Code onjuist, probeer het opnieuw.');
-        }
-    }
-</script>
-
-
-
-
-
-
 </body>
 </html>
