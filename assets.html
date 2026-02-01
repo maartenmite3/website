@@ -12,17 +12,11 @@
         .confidential { border-left: 5px solid #dc3545; background-color: #fffbfb; }
         .internal { border-left: 5px solid #ffc107; }
         .public { border-left: 5px solid #198754; }
-        
         .masked-data { filter: blur(5px); cursor: pointer; transition: 0.2s; user-select: none; display: inline-block; }
         .masked-data:hover, .masked-data.revealed { filter: none; }
-        
         .clickable-asset { cursor: pointer; color: #0d6efd; font-weight: bold; text-decoration: underline; }
-        
-        /* Stijl voor de graaf */
         #networkGraph { width: 100%; height: 500px; border: 1px solid #ddd; background-color: #f8f9fa; }
-        
-        /* Asset Icoon Stijl */
-        .asset-icon { font-size: 1.5rem; vertical-align: middle; }
+        .asset-icon-img { width: 24px; height: 24px; vertical-align: middle; margin-right: 10px; }
     </style>
 </head>
 <body class="bg-light">
@@ -75,7 +69,7 @@
                         <input type="hidden" id="assetId">
                         <div class="row g-3">
                             <div class="col-md-6"><label>Naam</label><input type="text" id="name" class="form-control" required></div>
-                            <div class="col-md-3"><label>Type</label><select id="type" class="form-select"><option>Virtual Machine</option><option>SQL Database</option><option>App Service</option><option>Firewall</option><option>Network Interface</option><option>Key Vault</option><option>Storage Account</option></select></div>
+                            <div class="col-md-3"><label>Type</label><select id="type" class="form-select"><option>Virtual Machine</option><option>SQL Database</option><option>App Service</option><option>Firewall</option><option>Network Interface</option><option>Key Vault</option><option>Storage Account</option><option>Recovery Services Vault</option><option>Private Endpoint</option></select></div>
                             <div class="col-md-3"><label>CIS Score</label><input type="number" id="cis" class="form-control" placeholder="0-100"></div>
                             <div class="col-md-6"><label>Subscriptie</label><select id="subSelect" class="form-select"></select></div>
                             <div class="col-md-6"><label class="text-danger">Eigenaar</label><input type="text" id="owner" class="form-control"></div>
@@ -186,26 +180,22 @@
         // INIT
         loadSubs();
 
-        // --- NIEUWE FUNCTIE: BEPAAL ICOON & KLEUR ---
-        function getAssetIcon(name, type) {
+        // --- MAPPING FUNCTIE VOOR JE ICONEN ---
+        function getAssetImage(name, type) {
             const n = name.toLowerCase();
+            const t = (type || '').toLowerCase();
             
-            // 1. Check Naam Patronen
-            if (n.includes('kv') || n.includes('keyvault')) return { icon: 'bi-key-fill', color: 'text-warning', title: 'Key Vault' };
-            if (n.includes('rsv') || n.includes('recovery')) return { icon: 'bi-life-preserver', color: 'text-danger', title: 'Recovery Vault' };
-            if (n.includes('avd') || n.includes('desktop')) return { icon: 'bi-pc-display', color: 'text-primary', title: 'AVD' };
-            if (n.includes('pe') || n.includes('private endpoint')) return { icon: 'bi-diagram-2-fill', color: 'text-info', title: 'Private Endpoint' };
-            
-            // 2. Check Type (Fallback)
-            if (type === 'SQL Database' || n.includes('db')) return { icon: 'bi-database', color: 'text-primary', title: 'Database' };
-            if (type === 'Virtual Machine' || n.includes('vm')) return { icon: 'bi-hdd-rack', color: 'text-secondary', title: 'Server' };
-            if (type === 'App Service' || n.includes('app')) return { icon: 'bi-globe', color: 'text-success', title: 'App Service' };
-            if (type === 'Storage Account' || n.includes('st')) return { icon: 'bi-box-seam', color: 'text-success', title: 'Storage' };
-            if (type === 'Firewall' || n.includes('fw')) return { icon: 'bi-bricks', color: 'text-danger', title: 'Firewall' };
-            if (type === 'Network Interface' || n.includes('nic')) return { icon: 'bi-ethernet', color: 'text-muted', title: 'NIC' };
+            // 1. Specifieke Services (Op Naam)
+            if (n.includes('avd') || n.includes('desktop') || t.includes('virtual machine') || n.includes('vm')) return '/icons/avd.svg';
+            if (n.includes('rsv') || n.includes('recovery')) return '/icons/rsv.svg'; // Vangt ook rsv-pe
+            if (n.includes('kv') || t.includes('key vault')) return '/icons/keyvault.svg'; // Vangt ook kv-pe
+            if (n.includes('sql') || t.includes('sql') || t.includes('database') || n.includes('db')) return '/icons/sql.svg';
 
-            // 3. Default
-            return { icon: 'bi-hdd-stack', color: 'text-muted', title: 'Asset' };
+            // 2. Netwerk Componenten
+            if (t.includes('private endpoint') || n.includes('pe')) return '/icons/privateendpoint.svg';
+            
+            // 3. Fallback / Default
+            return '/icons/nic.svg';
         }
 
         // --- RENDER TABLE ---
@@ -221,18 +211,17 @@
                 const ips = a.ips||[]; const ipDisp = (ips[0]||a.ip_address||'') + (ips.length>1?` <span class="badge bg-secondary">+${ips.length-1}</span>`:'');
                 const rev = isGlobalRevealed?'revealed':'';
 
-                // CIS Score
                 let cisDisplay = `<span class="${a.cis_score<50?'text-danger fw-bold':(a.cis_score<70?'text-warning':'text-success')}">${a.cis_score||0}%</span>`;
                 if(a.type === 'Network Interface') cisDisplay = '<span class="text-muted small">N.v.t.</span>';
 
-                // ICOON BEPALEN
-                const iconData = getAssetIcon(a.name, a.type);
+                // IMAGE URL
+                const imgUrl = getAssetImage(a.name, a.type);
 
                 tbody.innerHTML += `
                     <tr class="${rCls}">
                         <td>
                             <div class="d-flex align-items-center">
-                                <i class="bi ${iconData.icon} ${iconData.color} me-3 asset-icon" title="${iconData.title}"></i>
+                                <img src="${imgUrl}" class="asset-icon-img" alt="icon">
                                 <div>
                                     <span class="clickable-asset" onclick="openDetailModal(${a.id}, '${a.name}')">${a.name}</span><br>
                                     <small class="text-muted">${a.type}</small>
@@ -252,6 +241,52 @@
                         </td>
                     </tr>`;
             });
+        }
+
+        // --- NETWORK GRAPH ---
+        function openNetworkModal() {
+            if(!currentRelationships) return alert("Geen data");
+            new bootstrap.Modal(document.getElementById('networkModal')).show();
+            setTimeout(drawNetwork, 500);
+        }
+
+        function drawNetwork() {
+            const nodes = []; const edges = [];
+            const currentName = document.getElementById('detailTitle').innerText.replace('Details voor: ', '');
+            
+            // Centraal
+            const currentAsset = allAssets.find(a => a.id == currentAssetId);
+            const currentType = currentAsset ? currentAsset.type : '';
+            const currentImg = getAssetImage(currentName, currentType);
+
+            nodes.push({ id: currentAssetId, label: currentName, shape: 'image', image: currentImg, size: 30, font: { color: '#000', multi: true, bold: true } });
+            
+            // Downstream
+            currentRelationships.downstream.forEach(r => {
+                const img = getAssetImage(r.name, '');
+                nodes.push({ id: r.linked_asset_id, label: r.name, shape: 'image', image: img });
+                edges.push({ from: currentAssetId, to: r.linked_asset_id, label: r.relation_type, arrows: 'to' });
+            });
+            
+            // Upstream
+            currentRelationships.upstream.forEach(r => {
+                if(!nodes.find(n => n.id === r.linked_asset_id)) {
+                    const img = getAssetImage(r.name, '');
+                    nodes.push({ id: r.linked_asset_id, label: r.name, shape: 'image', image: img });
+                }
+                edges.push({ from: r.linked_asset_id, to: currentAssetId, label: r.relation_type, arrows: 'to' });
+            });
+
+            const container = document.getElementById('networkGraph');
+            const data = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
+            const options = { physics: { enabled: true, stabilization: { iterations: 200 } }, layout: { randomSeed: 2 }, interaction: { zoomView: true, dragView: true }, nodes: { borderWidth: 1, borderWidthSelected: 2, color: { border: '#ddd', background: '#fff' } } };
+            networkInstance = new vis.Network(container, data, options);
+        }
+
+        function exportNetworkImage() {
+            if(!networkInstance) return;
+            const canvas = document.querySelector('#networkGraph canvas');
+            const link = document.createElement('a'); link.download = `network_map_${currentAssetId}.png`; link.href = canvas.toDataURL(); link.click();
         }
 
         // --- CORE LOADERS ---
@@ -303,7 +338,7 @@
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `assets_export_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(link); link.click(); document.body.removeChild(link);
         }
 
-        // --- DETAILS / RELATIES / NETWERK ---
+        // --- DETAILS / RELATIES ---
         async function openDetailModal(id, name) {
             currentAssetId = id; document.getElementById('detailTitle').innerText = `Details voor: ${name}`;
             try {
@@ -320,41 +355,6 @@
                 
                 new bootstrap.Modal(document.getElementById('detailModal')).show();
             } catch(e) { console.error(e); alert("Details fout"); }
-        }
-
-        function openNetworkModal() {
-            if(!currentRelationships) return alert("Geen data");
-            new bootstrap.Modal(document.getElementById('networkModal')).show();
-            setTimeout(drawNetwork, 500);
-        }
-
-        function drawNetwork() {
-            const nodes = []; const edges = [];
-            const currentName = document.getElementById('detailTitle').innerText.replace('Details voor: ', '');
-            nodes.push({ id: currentAssetId, label: currentName, color: '#0d6efd', shape: 'box', font: {color:'white'} });
-            
-            currentRelationships.downstream.forEach(r => {
-                nodes.push({ id: r.linked_asset_id, label: r.name, color: '#ffc107', shape: 'ellipse' });
-                edges.push({ from: currentAssetId, to: r.linked_asset_id, label: r.relation_type, arrows: 'to' });
-            });
-            currentRelationships.upstream.forEach(r => {
-                if(!nodes.find(n => n.id === r.linked_asset_id)) nodes.push({ id: r.linked_asset_id, label: r.name, color: '#198754', shape: 'ellipse' });
-                edges.push({ from: r.linked_asset_id, to: currentAssetId, label: r.relation_type, arrows: 'to' });
-            });
-
-            const container = document.getElementById('networkGraph');
-            const data = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
-            const options = { physics: { enabled: true, stabilization: { iterations: 200 } }, layout: { randomSeed: 2 }, interaction: { zoomView: true, dragView: true } };
-            networkInstance = new vis.Network(container, data, options);
-        }
-
-        function exportNetworkImage() {
-            if(!networkInstance) return;
-            const canvas = document.querySelector('#networkGraph canvas');
-            const link = document.createElement('a');
-            link.download = `network_map_${currentAssetId}.png`;
-            link.href = canvas.toDataURL();
-            link.click();
         }
 
         async function loadAssetDropdown() {
