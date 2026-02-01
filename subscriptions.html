@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
-    <title>Abonnementen Beheer</title>
+    <title>Subscriptie Beheer</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
 </head>
@@ -13,44 +13,216 @@
         </div>
     </nav>
     <div class="container">
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-secondary text-white">Nieuw Abonnement</div>
-            <div class="card-body">
-                <form id="subForm" class="row g-2">
-                    <div class="col-md-3"><input type="text" id="subName" class="form-control" placeholder="Naam (bv. Prod-IT)" required></div>
-                    <div class="col-md-4"><input type="text" id="subGuid" class="form-control" placeholder="GUID (xxxxxxxx-xxxx...)" required></div>
-                    <div class="col-md-4"><input type="text" id="subResp" class="form-control" placeholder="Verantwoordelijken (Jan, Piet)" required></div>
-                    <div class="col-md-1"><button type="submit" class="btn btn-success w-100"><i class="bi bi-plus"></i></button></div>
-                </form>
+        
+        <div class="d-flex justify-content-between mb-3">
+            <button class="btn btn-primary" onclick="openModal()"><i class="bi bi-plus-lg"></i> Nieuw</button>
+            <button class="btn btn-success" onclick="openImportModal()"><i class="bi bi-file-earmark-spreadsheet"></i> Import CSV</button>
+        </div>
+
+        <div class="card shadow-sm">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light"><tr><th>Naam</th><th>GUID</th><th>Verantwoordelijken</th><th class="text-end">Actie</th></tr></thead>
+                <tbody id="subTable"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="modal fade" id="subModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title" id="modalTitle">Subscriptie</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <form id="subForm">
+                        <input type="hidden" id="subId">
+                        <div class="mb-2"><label>Naam</label><input type="text" id="subName" class="form-control" required></div>
+                        <div class="mb-2"><label>GUID</label><input type="text" id="subGuid" class="form-control" required></div>
+                        <div class="mb-2"><label>Verantwoordelijken</label><input type="text" id="subResp" class="form-control" placeholder="bv. Jan, Piet"></div>
+                        <button type="submit" class="btn btn-success w-100 mt-3">Opslaan</button>
+                    </form>
+                </div>
             </div>
         </div>
-        <div class="card shadow-sm"><table class="table table-hover mb-0"><tbody id="subTable"></tbody></table></div>
     </div>
+
+    <div class="modal fade" id="importModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title">Subscripties Importeren</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Selecteer CSV bestand</label>
+                        <input type="file" id="csvFile" class="form-control" accept=".csv">
+                        <div class="form-text">Verwachte kolommen: <code>subscription_name, subscription_id</code></div>
+                    </div>
+                    <button class="btn btn-primary mb-3" onclick="analyzeCSV()">Analyseren</button>
+                    
+                    <div id="importPreview" class="d-none">
+                        <h6>Resultaat Analyse:</h6>
+                        <ul class="nav nav-tabs" id="importTabs">
+                            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabNew">Nieuw (<span id="countNew">0</span>)</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabExist">Bestaat al (<span id="countExist">0</span>)</a></li>
+                        </ul>
+                        <div class="tab-content border p-2 mb-3" style="max-height: 200px; overflow-y: auto;">
+                            <div class="tab-pane fade show active" id="tabNew"><table class="table table-sm text-success"><tbody id="listNew"></tbody></table></div>
+                            <div class="tab-pane fade" id="tabExist"><table class="table table-sm text-muted"><tbody id="listExist"></tbody></table></div>
+                        </div>
+                        <button class="btn btn-success w-100" id="btnConfirmImport" onclick="executeImport()" disabled>Importeren Starten</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        let importData = { new: [] };
+        let allSubs = [];
+
         loadSubs();
+
         async function loadSubs() {
             const res = await fetch('/api/subscriptions');
-            const data = await res.json();
-            document.getElementById('subTable').innerHTML = data.map(s => `
+            if(res.status === 401) return window.location.href = '/login.html';
+            allSubs = await res.json();
+            
+            const tbody = document.getElementById('subTable');
+            tbody.innerHTML = allSubs.map(s => `
                 <tr>
-                    <td><strong>${s.name}</strong><br><small class="text-muted">${s.guid}</small></td>
-                    <td><i class="bi bi-people"></i> ${s.responsibles}</td>
-                    <td class="text-end"><button class="btn btn-sm btn-outline-danger" onclick="delSub(${s.id})"><i class="bi bi-trash"></i></button></td>
+                    <td><strong>${s.name}</strong></td>
+                    <td class="text-muted small">${s.guid}</td>
+                    <td>${s.responsibles || '-'}</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary" onclick="openEdit(${s.id})"><i class="bi bi-pencil"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="delSub(${s.id})"><i class="bi bi-trash"></i></button>
+                    </td>
                 </tr>`).join('');
         }
+
+        // --- EDIT / CREATE ---
+        function openModal() {
+            document.getElementById('subForm').reset();
+            document.getElementById('subId').value = '';
+            document.getElementById('modalTitle').innerText = 'Nieuwe Subscriptie';
+            new bootstrap.Modal(document.getElementById('subModal')).show();
+        }
+
+        function openEdit(id) {
+            const s = allSubs.find(x => x.id === id);
+            document.getElementById('subId').value = s.id;
+            document.getElementById('subName').value = s.name;
+            document.getElementById('subGuid').value = s.guid;
+            document.getElementById('subResp').value = s.responsibles;
+            document.getElementById('modalTitle').innerText = 'Subscriptie Bewerken';
+            new bootstrap.Modal(document.getElementById('subModal')).show();
+        }
+
         document.getElementById('subForm').onsubmit = async (e) => {
             e.preventDefault();
-            await fetch('/api/subscriptions', {
-                method: 'POST', headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({
-                    name: document.getElementById('subName').value,
-                    guid: document.getElementById('subGuid').value,
-                    responsibles: document.getElementById('subResp').value
-                })
+            const id = document.getElementById('subId').value;
+            const data = {
+                id: id ? id : null,
+                name: document.getElementById('subName').value,
+                guid: document.getElementById('subGuid').value,
+                responsibles: document.getElementById('subResp').value
+            };
+            
+            const method = id ? 'PUT' : 'POST';
+            const res = await fetch('/api/subscriptions', {
+                method: method,
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify(data)
             });
-            document.getElementById('subForm').reset(); loadSubs();
+
+            if(res.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('subModal')).hide();
+                loadSubs();
+            } else {
+                alert("Fout: " + await res.text());
+            }
         };
-        async function delSub(id) { if(confirm('Wissen?')) { await fetch('/api/subscriptions', { method: 'DELETE', body: JSON.stringify({id}) }); loadSubs(); }}
+
+        async function delSub(id) {
+            if(confirm('Wissen?')) { 
+                await fetch('/api/subscriptions', { method: 'DELETE', body: JSON.stringify({id}) }); 
+                loadSubs(); 
+            }
+        }
+
+        // --- IMPORT LOGIC ---
+        function openImportModal() {
+            document.getElementById('importPreview').classList.add('d-none');
+            document.getElementById('csvFile').value = '';
+            new bootstrap.Modal(document.getElementById('importModal')).show();
+        }
+
+        function analyzeCSV() {
+            const file = document.getElementById('csvFile').files[0];
+            if(!file) return alert("Kies een bestand");
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const text = e.target.result;
+                const rows = csvToJSON(text);
+                
+                // Stuur naar backend voor check
+                const res = await fetch('/api/import-handler', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ mode: 'check', type: 'subscriptions', data: rows })
+                });
+                
+                const report = await res.json();
+                importData.new = report.new; // Opslaan voor execute stap
+
+                // Render Preview
+                document.getElementById('countNew').innerText = report.new.length;
+                document.getElementById('countExist').innerText = report.existing.length;
+                
+                document.getElementById('listNew').innerHTML = report.new.map(i => `<tr><td><i class="bi bi-plus-circle"></i> ${i.name}</td><td>${i.guid}</td></tr>`).join('');
+                document.getElementById('listExist').innerHTML = report.existing.map(i => `<tr><td>${i.name} (Bestaat al)</td><td>${i.guid}</td></tr>`).join('');
+
+                document.getElementById('importPreview').classList.remove('d-none');
+                document.getElementById('btnConfirmImport').disabled = report.new.length === 0;
+                document.getElementById('btnConfirmImport').innerText = `Importeer ${report.new.length} items`;
+            };
+            reader.readAsText(file);
+        }
+
+        async function executeImport() {
+            if(!confirm(`Weet je zeker dat je ${importData.new.length} subscripties wilt importeren?`)) return;
+
+            const res = await fetch('/api/import-handler', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ mode: 'execute', type: 'subscriptions', data: importData.new })
+            });
+
+            if(res.ok) {
+                alert("Import succesvol!");
+                bootstrap.Modal.getInstance(document.getElementById('importModal')).hide();
+                loadSubs();
+            } else {
+                alert("Er ging iets mis.");
+            }
+        }
+
+        function csvToJSON(csv) {
+            const lines = csv.split('\n');
+            const result = [];
+            const headers = lines[0].split(',').map(h => h.trim().replace(/\r/,''));
+            
+            for(let i=1; i<lines.length; i++) {
+                if(!lines[i].trim()) continue;
+                const obj = {};
+                const currentline = lines[i].split(',');
+                
+                for(let j=0; j<headers.length; j++) {
+                    obj[headers[j]] = currentline[j] ? currentline[j].trim().replace(/\r/,'') : '';
+                }
+                result.push(obj);
+            }
+            return result;
+        }
     </script>
 </body>
 </html>
