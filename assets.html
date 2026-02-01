@@ -92,13 +92,15 @@
             <div class="modal-content">
                 <div class="modal-header"><h5 class="modal-title" id="detailTitle">Details</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body p-0">
-                    <ul class="nav nav-tabs nav-fill bg-light" role="tablist">
-                        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabVuln">🛑 Kwetsbaarheden</a></li>
-                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabCis">✅ CIS</a></li>
-                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabRel">🔗 Relaties</a></li>
-                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabHist">🕒 Geschiedenis</a></li>
+                    <ul class="nav nav-tabs nav-fill bg-light" id="detailTabs" role="tablist">
+                        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabVuln" type="button">🛑 Kwetsbaarheden</button></li>
+                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabCis" type="button">✅ CIS</button></li>
+                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabRel" type="button">🔗 Relaties</button></li>
+                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabHist" type="button">🕒 Geschiedenis</button></li>
                     </ul>
+                    
                     <div class="tab-content p-3">
+                        
                         <div class="tab-pane fade show active" id="tabVuln">
                             <form id="vulnForm" class="row g-2 mb-3 bg-light p-2 border rounded">
                                 <div class="col-md-3"><input type="text" id="vName" class="form-control form-control-sm" placeholder="Kwetsbaarheid"></div>
@@ -121,14 +123,15 @@
                         </div>
 
                         <div class="tab-pane fade" id="tabRel">
-                            <div class="alert alert-info py-2 small">Definieer afhankelijkheden. Bijv: "Deze asset draait op..."</div>
+                            <div class="alert alert-info py-2 small">Koppel assets aan elkaar.</div>
                             <form id="relForm" class="row g-2 mb-3 bg-light p-2 border rounded align-items-center">
-                                <div class="col-auto">Deze asset</div>
+                                <div class="col-auto">Deze asset...</div>
                                 <div class="col-md-3">
                                     <select id="rType" class="form-select form-select-sm">
                                         <option value="Draait op">Draait op</option>
                                         <option value="Verbonden met">Verbonden met</option>
                                         <option value="Afhankelijk van">Afhankelijk van</option>
+                                        <option value="Is onderdeel van">Is onderdeel van</option>
                                     </select>
                                 </div>
                                 <div class="col-md-4">
@@ -137,10 +140,10 @@
                                 <div class="col-md-2"><button type="button" onclick="addRel()" class="btn btn-sm btn-success w-100">Koppelen</button></div>
                             </form>
                             
-                            <h6>Afhankelijkheden (Downstream)</h6>
+                            <h6>Afhankelijkheden (Waar deze asset van afhangt)</h6>
                             <table class="table table-sm table-bordered mb-3"><tbody id="relDownTable"></tbody></table>
                             
-                            <h6>Wordt gebruikt door (Upstream)</h6>
+                            <h6>Gebruikt door (Wie van deze asset afhangt)</h6>
                             <table class="table table-sm table-bordered"><tbody id="relUpTable"></tbody></table>
                         </div>
 
@@ -178,11 +181,9 @@
 
         // 1. EXPORT FUNCTIE
         async function exportCSV() {
-            // Haal ALLES op voor export (limit=all)
             const res = await fetch('/api/assets?limit=all');
             if(!res.ok) return alert('Fout bij ophalen data');
             const data = await res.json();
-            
             if (data.length === 0) return alert("Geen data.");
 
             const headers = ["ID", "Naam", "Type", "IP Adressen", "Subscriptie", "Eigenaar", "CIS Score", "Classificatie", "Gevoeligheid", "Vuln Count"];
@@ -211,7 +212,7 @@
             const res = await fetch('/api/asset-details?type=list');
             const list = await res.json();
             const sel = document.getElementById('rTarget');
-            sel.innerHTML = '';
+            sel.innerHTML = '<option value="">Selecteer asset...</option>';
             list.forEach(item => {
                 if(item.id !== currentAssetId) sel.innerHTML += `<option value="${item.id}">${item.name}</option>`;
             });
@@ -220,12 +221,15 @@
         async function addRel() {
             const targetId = document.getElementById('rTarget').value;
             const type = document.getElementById('rType').value;
+            if(!targetId) return alert("Kies een asset");
+            
             await fetch('/api/asset-details', { 
                 method: 'POST', 
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ type: 'rel', parent_id: currentAssetId, child_id: targetId, relation_type: type }) 
             });
-            // Reload details
+            
+            // Ververs data zonder modal te sluiten
             const name = document.getElementById('detailTitle').innerText.replace('Details voor: ', '');
             openDetailModal(currentAssetId, name);
         }
@@ -235,7 +239,7 @@
             await fetch('/api/asset-details', { method: 'DELETE', body: JSON.stringify({type, id}) });
             const name = document.getElementById('detailTitle').innerText.replace('Details voor: ', '');
             openDetailModal(currentAssetId, name);
-            if(type !== 'rel') loadAssets(); // Update counts in main table
+            if(type !== 'rel') loadAssets(); 
         }
 
         // --- CORE LOADERS ---
@@ -282,12 +286,17 @@
 
             data.forEach(a => {
                 let rCls = a.classification==='Confidential'?'confidential':(a.classification==='Internal'?'internal':'public');
-                let cisCls = a.cis_score<50?'text-danger fw-bold':(a.cis_score<70?'text-warning':'text-success');
                 let vBadge = a.vuln_count>0?`<span class="badge bg-danger">${a.vuln_count}</span>`:`<span class="badge bg-success">0</span>`;
                 const subObj = allSubs.find(s=>s.guid===a.subscription_id);
                 const subDisp = subObj?subObj.name:a.subscription_id;
                 const ips = a.ips||[]; const ipDisp = (ips[0]||a.ip_address||'') + (ips.length>1?` <span class="badge bg-secondary">+${ips.length-1}</span>`:'');
                 const rev = isGlobalRevealed?'revealed':'';
+
+                // CIS WEERGAVE LOGICA (AANGEPAST)
+                let cisDisplay = `<span class="${a.cis_score<50?'text-danger fw-bold':(a.cis_score<70?'text-warning':'text-success')}">${a.cis_score||0}%</span>`;
+                if(a.type === 'Network Interface') {
+                    cisDisplay = '<span class="text-muted small">N.v.t.</span>';
+                }
 
                 tbody.innerHTML += `
                     <tr class="${rCls}">
@@ -296,7 +305,7 @@
                         <td><span class="masked-data ${rev}" onclick="this.classList.toggle('revealed')">${subDisp}</span></td>
                         <td><span class="masked-data ${rev}" onclick="this.classList.toggle('revealed')">${a.owner_contact}</span></td>
                         <td>${(a.data_sensitivity||'').split(',').map(l=>l?`<span class="badge bg-secondary me-1">${l}</span>`:'').join('')}</td>
-                        <td class="${cisCls}">${a.cis_score||0}%</td>
+                        <td>${cisDisplay}</td>
                         <td>${vBadge}</td>
                         <td>${a.classification}</td>
                         <td class="text-end">
@@ -307,10 +316,12 @@
             });
         }
 
-        // --- DETAIL MODAL (Met Relaties) ---
+        // --- DETAIL MODAL ---
         async function openDetailModal(id, name) {
             currentAssetId = id;
             document.getElementById('detailTitle').innerText = `Details voor: ${name}`;
+            
+            // LAAD DATA
             try {
                 const res = await fetch(`/api/asset-details?id=${id}`);
                 const data = await res.json();
@@ -324,7 +335,9 @@
                 data.cis.forEach(c => cT.innerHTML+=`<tr><td>${c.control_id}</td><td>${c.description}</td><td>${c.justification}</td><td><i class="bi bi-trash text-danger" onclick="deleteDetail('cis',${c.id})"></i></td></tr>`);
                 
                 // Vul Relaties
-                loadAssetDropdown(); // Vul de dropdown
+                // BELANGRIJK: Eerst dropdown vullen!
+                await loadAssetDropdown(); 
+                
                 const rdT = document.getElementById('relDownTable'); rdT.innerHTML = '';
                 data.relationships.downstream.forEach(r => rdT.innerHTML += `<tr><td>${r.relation_type} <span class="fw-bold">${r.name}</span></td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
                 

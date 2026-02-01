@@ -3,9 +3,9 @@ export async function onRequestGet(context) {
   
   const url = new URL(context.request.url);
   const assetId = url.searchParams.get('id');
-  const type = url.searchParams.get('type'); // Nieuw: optie om 'lite' list op te halen
+  const type = url.searchParams.get('type');
 
-  // NIEUW: Helper om simpele lijst van alle assets op te halen (voor dropdown in relaties)
+  // 1. LIJST VOOR DROPDOWN (Nodig voor Relaties Tab)
   if (type === 'list') {
       const { results } = await context.env.MY_DB.prepare("SELECT id, name FROM assets ORDER BY name ASC").all();
       return Response.json(results);
@@ -14,13 +14,13 @@ export async function onRequestGet(context) {
   if (!assetId) return new Response('Missing ID', { status: 400 });
 
   try {
-      // 1. Haal details op
+      // 2. DETAILS OPHALEN
       const vulns = await context.env.MY_DB.prepare("SELECT * FROM vulnerabilities WHERE asset_id = ?").bind(assetId).all();
       const cis = await context.env.MY_DB.prepare("SELECT * FROM cis_exceptions WHERE asset_id = ?").bind(assetId).all();
       const history = await context.env.MY_DB.prepare("SELECT * FROM asset_history WHERE asset_id = ? ORDER BY timestamp DESC").bind(assetId).all();
 
-      // 2. Haal Relaties op (JOIN met assets tabel om de NAAM van de gekoppelde asset te zien)
-      // We halen op waar deze asset de PARENT is
+      // 3. RELATIES OPHALEN
+      // Parent = Ik ben de hoofd asset, Child = Hangt onder mij
       const children = await context.env.MY_DB.prepare(`
         SELECT r.id, r.relation_type, a.name, a.id as linked_asset_id 
         FROM asset_relationships r 
@@ -28,7 +28,7 @@ export async function onRequestGet(context) {
         WHERE r.parent_id = ?
       `).bind(assetId).all();
 
-      // We halen op waar deze asset de CHILD is
+      // Child = Ik hang onder iemand anders
       const parents = await context.env.MY_DB.prepare(`
         SELECT r.id, r.relation_type, a.name, a.id as linked_asset_id 
         FROM asset_relationships r 
@@ -41,8 +41,8 @@ export async function onRequestGet(context) {
           cis: cis.results || [],
           history: history.results || [],
           relationships: {
-              downstream: children.results || [], // Waar ik van afhang
-              upstream: parents.results || []     // Wie van mij afhangt
+              downstream: children.results || [],
+              upstream: parents.results || []
           }
       });
   } catch (err) {
@@ -61,8 +61,7 @@ export async function onRequestPost(context) {
       await context.env.MY_DB.prepare("INSERT INTO cis_exceptions (asset_id, control_id, description, justification) VALUES (?, ?, ?, ?)").bind(data.asset_id, data.control_id, data.description, data.justification).run();
   }
   else if (data.type === 'rel') {
-      // NIEUW: Relatie toevoegen
-      // Check of relatie al bestaat
+      // Relatie toevoegen
       const exists = await context.env.MY_DB.prepare("SELECT id FROM asset_relationships WHERE parent_id=? AND child_id=?").bind(data.parent_id, data.child_id).first();
       if(!exists) {
           await context.env.MY_DB.prepare("INSERT INTO asset_relationships (parent_id, child_id, relation_type) VALUES (?, ?, ?)").bind(data.parent_id, data.child_id, data.relation_type).run();
