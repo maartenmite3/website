@@ -227,6 +227,8 @@
             };
 
             const method = id ? 'PUT' : 'POST';
+            
+            // HIER ZAT DE FOUT: Variabele heet nu consequent 'res'
             const res = await fetch('/api/subscriptions', {
                 method: method,
                 headers: { 'Content-Type': 'application/json' },
@@ -312,14 +314,12 @@
             const lines = csv.split(/\r?\n/);
             if (lines.length < 1) return [];
             
-            // Verwijder BOM en quotes van headers
             const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').replace(/^\uFEFF/, ''));
             const result = [];
 
             for (let i = 1; i < lines.length; i++) {
                 if (!lines[i].trim()) continue;
                 
-                // Simpele split op komma
                 const currentline = lines[i].split(',');
                 const obj = {};
                 
