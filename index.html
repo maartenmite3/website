@@ -1,63 +1,130 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard</title>
-    <style>
-        body { margin: 0; font-family: sans-serif; }
-        nav { background: #333; color: white; padding: 10px; display: flex; justify-content: space-between; }
-        nav a { color: white; text-decoration: none; margin-left: 15px; cursor: pointer; }
-        .content { padding: 20px; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
-        .modal-content { background: white; margin: 10% auto; padding: 20px; width: 300px; border-radius: 5px; }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
 </head>
-<body>
-    <nav>
-        <div>Mijn Project</div>
-        <div>
-            <span>Placeholder 1</span>
-            <span>Placeholder 2</span>
-            <a onclick="openSettings()">⚙️ Settings</a>
-            <a href="/api/logout">Uitloggen</a>
+<body class="bg-light">
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">Mijn Project</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link active" href="#">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#">Placeholder 1</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#">Placeholder 2</a></li>
+                </ul>
+                <div class="d-flex align-items-center gap-3">
+                    <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#settingsModal">
+                        <i class="bi bi-gear-fill"></i> Settings
+                    </button>
+                    <a href="/api/logout" class="btn btn-danger btn-sm">Uitloggen</a>
+                </div>
+            </div>
         </div>
     </nav>
 
-    <div class="content">
-        <h1>Welkom <span id="username">...</span></h1>
-        <p>Dit is de geheime omgeving.</p>
-    </div>
-
-    <div id="settingsModal" class="modal">
-        <div class="modal-content">
-            <h2>Settings</h2>
-            <hr>
-            <h3>Wachtwoord wijzigen</h3>
-            <input type="password" id="newPass" placeholder="Nieuw wachtwoord">
-            <button onclick="updatePass()">Opslaan</button>
-            <hr>
-            <h3>MFA (Multi-Factor)</h3>
-            <p>Status: <span id="mfaStatus">Uitgeschakeld</span></p>
-            <button onclick="alert('MFA implementatie vereist externe library voor QR codes, dit is een placeholder.')">MFA Instellen</button>
-            <hr>
-            <button onclick="document.getElementById('settingsModal').style.display='none'">Sluiten</button>
+    <div class="container mt-5">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                Dashboard Overzicht
+            </div>
+            <div class="card-body">
+                <h1 class="display-6">Welkom terug, <span id="username" class="fw-bold">...</span>!</h1>
+                <p class="lead">Je bent succesvol ingelogd in de beveiligde omgeving.</p>
+                <hr>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Dit is een beveiligde indexpagina. Alleen gebruikers met een geldige sessie in de D1 database kunnen dit zien.
+                </div>
+            </div>
         </div>
     </div>
 
+    <div class="modal fade" id="settingsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Mijn Instellingen</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    
+                    <h6><i class="bi bi-key"></i> Wachtwoord Wijzigen</h6>
+                    <div class="input-group mb-3 mt-2">
+                        <input type="password" id="newPass" class="form-control" placeholder="Nieuw wachtwoord">
+                        <button class="btn btn-outline-secondary" type="button" onclick="updatePass()">Opslaan</button>
+                    </div>
+
+                    <hr>
+
+                    <h6><i class="bi bi-shield-lock"></i> Multi-Factor Authenticatie</h6>
+                    <p class="small text-muted mb-2">Status: <span id="mfaStatus" class="badge bg-secondary">Laden...</span></p>
+                    <button class="btn btn-outline-primary btn-sm w-100" onclick="alert('Voor MFA heb je een QR-code bibliotheek nodig. Dit is een demo.')">
+                        MFA Configureren
+                    </button>
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Sluiten</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
     <script>
-        // Laad gebruiker info bij start
-        fetch('/api/user').then(r => r.json()).then(user => {
-            document.getElementById('username').innerText = user.username;
-            document.getElementById('mfaStatus').innerText = user.mfa_enabled ? "AAN" : "UIT";
-        });
+        // 1. Data ophalen bij laden
+        fetch('/api/user')
+            .then(r => r.json())
+            .then(user => {
+                document.getElementById('username').innerText = user.username;
+                
+                const mfaBadge = document.getElementById('mfaStatus');
+                if (user.mfa_enabled) {
+                    mfaBadge.innerText = "Actief";
+                    mfaBadge.className = "badge bg-success";
+                } else {
+                    mfaBadge.innerText = "Niet actief";
+                    mfaBadge.className = "badge bg-warning text-dark";
+                }
+            })
+            .catch(err => console.error("Kon user niet laden", err));
 
-        function openSettings() { document.getElementById('settingsModal').style.display = 'block'; }
-
+        // 2. Wachtwoord updaten functie
         async function updatePass() {
-            const pass = document.getElementById('newPass').value;
-            if(!pass) return;
-            await fetch('/api/user', { method: 'PUT', body: JSON.stringify({ new_password: pass }) });
-            alert('Wachtwoord gewijzigd!');
-            document.getElementById('newPass').value = '';
+            const passField = document.getElementById('newPass');
+            const newPass = passField.value;
+            
+            if(!newPass) {
+                alert("Vul wel iets in!"); 
+                return;
+            }
+
+            try {
+                await fetch('/api/user', { 
+                    method: 'PUT', 
+                    body: JSON.stringify({ new_password: newPass }) 
+                });
+                alert('Wachtwoord succesvol gewijzigd!');
+                passField.value = ''; // Veld leegmaken
+                
+                // Sluit de modal netjes via Bootstrap code
+                const modalEl = document.getElementById('settingsModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                modal.hide();
+
+            } catch (e) {
+                alert('Fout bij opslaan.');
+            }
         }
     </script>
 </body>
