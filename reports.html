@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <title>Rapportage Centrum</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        /* Achtergrond donkergrijs voor contrast met het 'papier' */
+        body { background-color: #525659; }
+        
+        /* Het A4 Papier */
+        .page-container {
+            background: white;
+            width: 210mm;
+            min-height: 297mm;
+            margin: 2rem auto;
+            padding: 20mm;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        
+        /* Navigatie en balken verbergen tijdens printen */
+        @media print {
+            body { background: white; margin: 0; }
+            .no-print { display: none !important; }
+            .page-container { width: 100%; margin: 0; padding: 0; box-shadow: none; border: none; }
+            .page-break { page-break-before: always; }
+        }
+
+        .report-header { border-bottom: 2px solid #000; margin-bottom: 20px; padding-bottom: 10px; }
+        .kpi-box { border: 1px solid #ddd; padding: 15px; border-radius: 5px; text-align: center; background: #f8f9fa; }
+        .risk-high { background-color: #ffeaea; border-left: 5px solid #dc3545; }
+        .cursor-pointer { cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark no-print mb-0">
+        <div class="container">
+            <span class="navbar-brand"><i class="bi bi-file-earmark-bar-graph"></i> Rapportages</span>
+            <div class="d-flex gap-3 align-items-center">
+                <a href="/assets.html" class="btn btn-outline-light btn-sm" data-i18n="btn_back">Terug naar Assets</a>
+                <a href="/" class="btn btn-outline-light btn-sm" data-i18n="btn_dashboard">Dashboard</a>
+                
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-translate"></i> <span id="currentLang">NL</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item cursor-pointer" onclick="setLanguage('nl')">🇳🇱 Nederlands</a></li>
+                        <li><a class="dropdown-item cursor-pointer" onclick="setLanguage('en')">🇬🇧 English</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="bg-light border-bottom py-3 no-print">
+        <div class="container d-flex gap-3 align-items-center flex-wrap">
+            <div class="d-flex align-items-center gap-2">
+                <label class="fw-bold" data-i18n="lbl_type">Type:</label>
+                <select id="reportType" class="form-select w-auto" onchange="toggleSubSelect()">
+                    <option value="management" data-i18n="opt_mgmt">CISO / Management Summary</option>
+                    <option value="subscription" data-i18n="opt_sub">Subscriptie Detail</option>
+                </select>
+            </div>
+
+            <div id="subSelectContainer" class="d-flex align-items-center gap-2 d-none">
+                <label class="fw-bold" data-i18n="lbl_sub">Subscriptie:</label>
+                <select id="subSelect" class="form-select w-auto"><option>Laden...</option></select>
+            </div>
+
+            <button class="btn btn-primary" onclick="generateReport()"><i class="bi bi-magic"></i> <span data-i18n="btn_gen">Genereren</span></button>
+            <button class="btn btn-success ms-auto" onclick="window.print()"><i class="bi bi-printer"></i> <span data-i18n="btn_print">Print / PDF</span></button>
+        </div>
+    </div>
+
+    <div class="page-container" id="reportContent">
+        <div class="text-center text-muted py-5">
+            <h3 data-i18n="msg_select">Selecteer een type en klik op Genereren</h3>
+            <i class="bi bi-arrow-up display-4"></i>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // --- TRANSLATIONS ---
+        const translations = {
+            nl: {
+                btn_back: "Terug naar Assets", btn_dashboard: "Dashboard",
+                lbl_type: "Type Rapport:", opt_mgmt: "CISO / Management Summary", opt_sub: "Subscriptie Detail",
+                lbl_sub: "Kies Subscriptie:", btn_gen: "Genereren", btn_print: "Print / PDF",
+                msg_select: "Selecteer instellingen en klik op Genereren.",
+                rep_title_mgmt: "Security Management Rapport", rep_title_sub: "Subscriptie Security Kaart",
+                sec_kpi: "Kerncijfers", sec_top10: "Top 10 Risico Assets", sec_vuln: "Kwetsbaarheden",
+                th_asset: "Asset", th_cis: "CIS Score", th_vulns: "Kwetsbaarheden", th_owner: "Eigenaar",
+                lbl_gen_date: "Gegenereerd op:", lbl_total: "Totaal Assets", lbl_avg_cis: "Gem. CIS", lbl_crit: "Criticals",
+                txt_no_risks: "Geen assets met hoge risico's gevonden. Goed bezig!",
+                txt_sub_score: "Team Score", txt_sub_assets: "Assets in beheer",
+                col_confidential: "Data Classificatie"
+            },
+            en: {
+                btn_back: "Back to Assets", btn_dashboard: "Dashboard",
+                lbl_type: "Report Type:", opt_mgmt: "CISO / Management Summary", opt_sub: "Subscription Detail",
+                lbl_sub: "Choose Subscription:", btn_gen: "Generate", btn_print: "Print / PDF",
+                msg_select: "Select options and click Generate.",
+                rep_title_mgmt: "Security Management Report", rep_title_sub: "Subscription Security Card",
+                sec_kpi: "Key Metrics", sec_top10: "Top 10 Risk Assets", sec_vuln: "Vulnerabilities",
+                th_asset: "Asset", th_cis: "CIS Score", th_vulns: "Vulnerabilities", th_owner: "Owner",
+                lbl_gen_date: "Generated on:", lbl_total: "Total Assets", lbl_avg_cis: "Avg CIS", lbl_crit: "Criticals",
+                txt_no_risks: "No high-risk assets found. Great job!",
+                txt_sub_score: "Team Score", txt_sub_assets: "Assets managed",
+                col_confidential: "Data Classification"
+            }
+        };
+
+        // --- GLOBAL DATA ---
+        let allAssets = [];
+        let allSubs = [];
+
+        // --- STARTUP LOGIC ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            applyLanguage();
+            await loadSubs();
+            await loadAssets();
+        });
+
+        // --- I18N ---
+        function setLanguage(lang) { localStorage.setItem('lang', lang); location.reload(); }
+        function applyLanguage() {
+            const lang = localStorage.getItem('lang') || 'nl';
+            document.getElementById('currentLang').innerText = lang.toUpperCase();
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if(translations[lang][key]) el.innerText = translations[lang][key];
+            });
+        }
+        function t(key) { const lang = localStorage.getItem('lang') || 'nl'; return translations[lang][key] || key; }
+
+        // --- DATA LOADERS ---
+        async function loadSubs() {
+            try {
+                const res = await fetch('/api/subscriptions');
+                if(res.ok) {
+                    allSubs = await res.json();
+                    const sel = document.getElementById('subSelect');
+                    sel.innerHTML = '';
+                    allSubs.forEach(s => sel.innerHTML += `<option value="${s.guid}">${s.name}</option>`);
+                }
+            } catch(e) { console.error("Subs load error", e); }
+        }
+
+        async function loadAssets() {
+            try {
+                const res = await fetch('/api/assets?limit=all');
+                if(res.status === 401) return window.location.href='/login.html';
+                const json = await res.json();
+                allAssets = json.data;
+            } catch(e) { console.error("Assets load error", e); }
+        }
+
+        function toggleSubSelect() {
+            const type = document.getElementById('reportType').value;
+            const subBox = document.getElementById('subSelectContainer');
+            if(type === 'subscription') subBox.classList.remove('d-none'); else subBox.classList.add('d-none');
+        }
+
+        // --- GENERATORS ---
+        function generateReport() {
+            const type = document.getElementById('reportType').value;
+            const container = document.getElementById('reportContent');
+            const dateStr = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString();
+
+            container.innerHTML = ''; // Clear
+
+            if(type === 'management') {
+                renderManagementReport(container, dateStr);
+            } else {
+                renderSubscriptionReport(container, dateStr);
+            }
+        }
+
+        function renderManagementReport(container, date) {
+            // Berekeningen
+            const total = allAssets.length;
+            const cisSum = allAssets.filter(a => a.type !== 'Network Interface').reduce((sum, a) => sum + (a.cis_score || 0), 0);
+            const countCis = allAssets.filter(a => a.type !== 'Network Interface').length;
+            const avgCis = countCis ? Math.round(cisSum / countCis) : 0;
+            const criticals = allAssets.reduce((sum, a) => sum + (a.vuln_count || 0), 0);
+
+            // Risk Scoring & Sorting
+            const riskAssets = [...allAssets].map(a => {
+                let score = (100 - (a.cis_score || 0)) + ((a.vuln_count || 0) * 10);
+                if(a.classification === 'Confidential') score += 50;
+                return { ...a, riskScore: score };
+            }).sort((a,b) => b.riskScore - a.riskScore).slice(0, 10);
+
+            // HTML Bouwen
+            container.innerHTML = `
+                <div class="report-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1>${t('rep_title_mgmt')}</h1>
+                        <p class="text-muted mb-0">Security Center Asset Inventory</p>
+                    </div>
+                    <div class="text-end">
+                        <small class="text-muted">${t('lbl_gen_date')}</small><br>
+                        <strong>${date}</strong>
+                    </div>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-4"><div class="kpi-box"><h3>${total}</h3><small>${t('lbl_total')}</small></div></div>
+                    <div class="col-4"><div class="kpi-box"><h3>${avgCis}%</h3><small>${t('lbl_avg_cis')}</small></div></div>
+                    <div class="col-4"><div class="kpi-box text-danger"><h3>${criticals}</h3><small>${t('lbl_crit')}</small></div></div>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-6">
+                        <h5>${t('col_confidential')}</h5>
+                        <canvas id="chartClass" style="max-height:200px"></canvas>
+                    </div>
+                    <div class="col-6">
+                        <h5>Assets per Type</h5>
+                        <canvas id="chartType" style="max-height:200px"></canvas>
+                    </div>
+                </div>
+
+                <h4 class="mt-5 mb-3 text-danger border-bottom pb-2">${t('sec_top10')}</h4>
+                <table class="table table-striped table-sm">
+                    <thead>
+                        <tr>
+                            <th>${t('th_asset')}</th>
+                            <th>Type</th>
+                            <th>Subscriptie</th>
+                            <th>${t('th_owner')}</th>
+                            <th>${t('th_cis')}</th>
+                            <th>${t('th_vulns')}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${riskAssets.map(a => `
+                            <tr>
+                                <td class="fw-bold">${a.name} ${a.classification==='Confidential'?'<span class="badge bg-danger">Confidential</span>':''}</td>
+                                <td>${a.type}</td>
+                                <td>${lookupSub(a.subscription_id)}</td>
+                                <td>${a.owner_contact}</td>
+                                <td>${renderCis(a)}</td>
+                                <td>${a.vuln_count > 0 ? `<span class="badge bg-danger">${a.vuln_count}</span>` : '-'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            // Charts Renderen (Even wachten tot DOM klaar is)
+            setTimeout(() => {
+                const ctx1 = document.getElementById('chartClass').getContext('2d');
+                const classes = {}; allAssets.forEach(a => classes[a.classification] = (classes[a.classification]||0)+1);
+                new Chart(ctx1, { type: 'doughnut', data: { labels: Object.keys(classes), datasets: [{ data: Object.values(classes), backgroundColor: ['#dc3545', '#ffc107', '#198754'] }] } });
+
+                const ctx2 = document.getElementById('chartType').getContext('2d');
+                const types = {}; allAssets.forEach(a => types[a.type] = (types[a.type]||0)+1);
+                new Chart(ctx2, { type: 'bar', data: { labels: Object.keys(types), datasets: [{ label: 'Count', data: Object.values(types), backgroundColor: '#0d6efd' }] }, options: { indexAxis: 'y' } });
+            }, 100);
+        }
+
+        function renderSubscriptionReport(container, date) {
+            const subId = document.getElementById('subSelect').value;
+            const subName = document.getElementById('subSelect').options[document.getElementById('subSelect').selectedIndex].text;
+            
+            const assets = allAssets.filter(a => a.subscription_id === subId);
+            
+            const subCisSum = assets.filter(a => a.type !== 'Network Interface').reduce((sum, a) => sum + (a.cis_score || 0), 0);
+            const subCount = assets.filter(a => a.type !== 'Network Interface').length;
+            const subAvg = subCount ? Math.round(subCisSum / subCount) : 0;
+
+            container.innerHTML = `
+                <div class="report-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1>${t('rep_title_sub')}</h1>
+                        <h4 class="text-primary">${subName}</h4>
+                        <small class="font-monospace">${subId}</small>
+                    </div>
+                    <div class="text-end">
+                        <small class="text-muted">${t('lbl_gen_date')}</small><br>
+                        <strong>${date}</strong>
+                    </div>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-6"><div class="kpi-box"><h3>${assets.length}</h3><small>${t('txt_sub_assets')}</small></div></div>
+                    <div class="col-6"><div class="kpi-box ${subAvg < 55 ? 'text-danger' : 'text-success'}"><h3>${subAvg}%</h3><small>${t('txt_sub_score')}</small></div></div>
+                </div>
+
+                <h5 class="mt-4 border-bottom">Asset Inventory</h5>
+                <table class="table table-sm align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Asset</th>
+                            <th>Type</th>
+                            <th>IP</th>
+                            <th>Owner</th>
+                            <th>CIS</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${assets.map(a => `
+                            <tr class="${a.vuln_count > 0 ? 'risk-high' : ''}">
+                                <td class="fw-bold">${a.name}</td>
+                                <td>${a.type}</td>
+                                <td>${(a.ips||[]).join(', ') || a.ip_address}</td>
+                                <td>${a.owner_contact}</td>
+                                <td>${renderCis(a)}</td>
+                                <td>${a.vuln_count > 0 ? `<span class="badge bg-danger">${a.vuln_count} Issues</span>` : '<span class="text-success"><i class="bi bi-check"></i> OK</span>'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        // Helpers
+        function lookupSub(guid) { const s = allSubs.find(x => x.guid === guid); return s ? s.name : guid; }
+        function renderCis(a) { 
+            if(a.type === 'Network Interface') return '<span class="text-muted">-</span>';
+            const c = a.cis_score || 0;
+            return `<span class="${c<55?'text-danger fw-bold':(c<75?'text-warning':'text-success')}">${c}%</span>`;
+        }
+    </script>
+</body>
+</html>
