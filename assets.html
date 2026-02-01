@@ -170,16 +170,18 @@
                 <div class="modal-header bg-dark text-white"><h5 class="modal-title"><i class="bi bi-diagram-2"></i> <span data-i18n="modal_network">Netwerk Overzicht</span></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body p-0 position-relative">
                     <div id="networkGraph"></div>
+                    
                     <div class="position-absolute top-0 end-0 m-3 d-flex gap-2">
-                        <button class="btn btn-light shadow-sm border btn-sm" onclick="togglePhysics()" id="physBtn"><i class="bi bi-play-fill"></i> Organiseren</button>
-                        <button class="btn btn-primary shadow-sm border btn-sm" onclick="saveLayout()"><i class="bi bi-save"></i> Opslaan</button>
-                        <button class="btn btn-light shadow-sm border btn-sm" onclick="exportNetworkImage()"><i class="bi bi-camera"></i> Foto</button>
+                        <button class="btn btn-light shadow-sm border btn-sm" onclick="togglePhysics()" id="physBtn"><i class="bi bi-play-fill"></i> <span data-i18n="btn_organize">Organiseren</span></button>
+                        <button class="btn btn-primary shadow-sm border btn-sm" onclick="saveLayout()"><i class="bi bi-save"></i> <span data-i18n="btn_save_layout">Opslaan</span></button>
+                        <button class="btn btn-light shadow-sm border btn-sm" onclick="exportNetworkImage()"><i class="bi bi-camera"></i> <span data-i18n="btn_photo">Foto</span></button>
                     </div>
+
                     <div class="position-absolute bottom-0 start-0 m-3 small bg-white p-2 rounded border shadow-sm">
-                        <div id="threatAlert" class="text-danger fw-bold mb-1 d-none"><i class="bi bi-exclamation-triangle"></i> Cross-Subscription!</div>
-                        <div><span style="color:#0d6efd">●</span> Asset</div>
-                        <div><span style="color:#ffc107">●</span> Downstream</div>
-                        <div><span style="color:#198754">●</span> Upstream</div>
+                        <div id="threatAlert" class="text-danger fw-bold mb-1 d-none"><i class="bi bi-exclamation-triangle"></i> <span data-i18n="lbl_cross_sub">Cross-Subscription!</span></div>
+                        <div><span style="color:#0d6efd">●</span> <span data-i18n="lbl_current_asset">Huidige Asset</span></div>
+                        <div><span style="color:#ffc107">●</span> <span data-i18n="lbl_downstream">Downstream</span></div>
+                        <div><span style="color:#198754">●</span> <span data-i18n="lbl_upstream">Upstream</span></div>
                     </div>
                 </div>
             </div>
@@ -216,7 +218,10 @@
                 th_name: "Naam", th_date: "Datum", th_desc: "Beschrijving", th_reason: "Reden", th_time: "Tijd", th_who: "Wie",
                 hdr_downstream: "Afhankelijkheden (Downstream)", hdr_upstream: "Wordt gebruikt door (Upstream)", rel_info: "Koppel assets om afhankelijkheden in kaart te brengen.", lbl_this_asset: "Deze asset...",
                 modal_network: "Netwerk Overzicht", modal_import: "Importeren", btn_analyze: "Analyseren", tab_new: "Nieuw", btn_start_import: "Start Import",
-                txt_prev: "Vorige", txt_next: "Volgende", txt_no_data: "Geen data", alert_saved: "Opgeslagen", alert_deleted: "Verwijderd", alert_confirm: "Zeker weten?"
+                txt_prev: "Vorige", txt_next: "Volgende", txt_no_data: "Geen data", alert_saved: "Opgeslagen", alert_deleted: "Verwijderd", alert_confirm: "Zeker weten?",
+                // Network Modal Specifics
+                btn_organize: "Organiseren", btn_stop_organize: "Stop Organiseren", btn_save_layout: "Layout Opslaan", btn_photo: "Foto",
+                lbl_cross_sub: "Cross-Subscription Gedetecteerd!", lbl_current_asset: "Huidige Asset", lbl_downstream: "Afhankelijkheden", lbl_upstream: "Gebruikt door"
             },
             en: {
                 btn_manage_subs: "Manage Subscriptions", btn_dashboard: "Dashboard", btn_new_asset: "New Asset", btn_import: "Import", btn_export: "Export", opt_all: "All",
@@ -227,7 +232,10 @@
                 th_name: "Name", th_date: "Date", th_desc: "Description", th_reason: "Reason", th_time: "Time", th_who: "Who",
                 hdr_downstream: "Dependencies (Downstream)", hdr_upstream: "Used by (Upstream)", rel_info: "Link assets to map dependencies.", lbl_this_asset: "This asset...",
                 modal_network: "Network Overview", modal_import: "Import", btn_analyze: "Analyze", tab_new: "New", btn_start_import: "Start Import",
-                txt_prev: "Previous", txt_next: "Next", txt_no_data: "No data", alert_saved: "Saved", alert_deleted: "Deleted", alert_confirm: "Are you sure?"
+                txt_prev: "Previous", txt_next: "Next", txt_no_data: "No data", alert_saved: "Saved", alert_deleted: "Deleted", alert_confirm: "Are you sure?",
+                // Network Modal Specifics
+                btn_organize: "Organize", btn_stop_organize: "Stop Organizing", btn_save_layout: "Save Layout", btn_photo: "Photo",
+                lbl_cross_sub: "Cross-Subscription Detected!", lbl_current_asset: "Current Asset", lbl_downstream: "Dependencies", lbl_upstream: "Used by"
             }
         };
 
@@ -240,7 +248,6 @@
                 const key = el.getAttribute('data-i18n');
                 if(translations[lang][key]) el.innerText = translations[lang][key];
             });
-            // Update table als die er is
             if(allAssets.length > 0) renderPagination(); 
         }
         function t(key) { const lang = localStorage.getItem('lang') || 'nl'; return translations[lang][key] || key; }
@@ -375,7 +382,14 @@
             if (!hasLayout) networkInstance.on("stabilizationIterationsDone", function () { networkInstance.setOptions( { physics: false } ); });
             networkInstance.on("dragStart", function (params) { networkInstance.setOptions( { physics: false } ); });
         }
-        function togglePhysics() { if(!networkInstance) return; const current = networkInstance.physics.physicsEnabled; networkInstance.setOptions({ physics: !current }); }
+        function togglePhysics() { 
+            if(!networkInstance) return; 
+            const current = networkInstance.physics.physicsEnabled; 
+            networkInstance.setOptions({ physics: !current });
+            const btnText = !current ? t('btn_stop_organize') : t('btn_organize');
+            const btnIcon = !current ? 'bi-pause-fill' : 'bi-play-fill';
+            document.getElementById('physBtn').innerHTML = `<i class="bi ${btnIcon}"></i> ${btnText}`;
+        }
         async function saveLayout() { if(!networkInstance) return; const positions = networkInstance.getPositions(); await fetch('/api/asset-details', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ type: 'layout', asset_id: currentAssetId, positions: positions }) }); alert(t('alert_saved')); currentLayout = positions; }
         function exportNetworkImage() { if(!networkInstance) return; const canvas = document.querySelector('#networkGraph canvas'); const link = document.createElement('a'); link.download = `network_map_${currentAssetId}.png`; link.href = canvas.toDataURL(); link.click(); }
 
