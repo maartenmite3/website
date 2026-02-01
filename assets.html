@@ -17,8 +17,6 @@
         .clickable-asset { cursor: pointer; color: #0d6efd; font-weight: bold; text-decoration: underline; }
         #networkGraph { width: 100%; height: 500px; border: 1px solid #ddd; background-color: #f8f9fa; }
         .asset-icon-img { width: 24px; height: 24px; vertical-align: middle; margin-right: 10px; }
-        
-        /* Pagination Styling */
         .pagination { margin-top: 1rem; margin-bottom: 2rem; }
     </style>
 </head>
@@ -63,8 +61,7 @@
         </div>
 
         <nav aria-label="Page navigation">
-            <ul class="pagination justify-content-center" id="paginationControls">
-                </ul>
+            <ul class="pagination justify-content-center" id="paginationControls"></ul>
         </nav>
     </div>
 
@@ -186,30 +183,29 @@
         let allSubs = []; let currentAssetId = null; let currentRelationships = null;
         let isGlobalRevealed = false; let importData = { new: [] }; let searchTimeout = null; let networkInstance = null;
         
-        // Paginatie Status
         let currentPage = 1;
         let totalPages = 1;
 
         // INIT
         loadSubs();
 
-        // --- IMAGE MAPPING ---
+        // --- IMAGE MAPPING (AANGEPAST AAN JOUW BESTANDEN) ---
         function getAssetImage(name, type) {
             const n = name.toLowerCase();
             const t = (type || '').toLowerCase();
             
-            if (n.includes('kv') || n.includes('keyvault')) return '/icons/kv.svg';
+            // 1. Specifieke diensten met eigen namen
+            if (n.includes('kv') || n.includes('keyvault')) return '/icons/keyvault.svg';
             if (n.includes('rsv') || n.includes('recovery')) return '/icons/rsv.svg';
-            if (n.includes('avd') || n.includes('desktop')) return '/icons/10021-icon-service-Virtual-Machine.svg';
-            if (n.includes('pe') || n.includes('private') || t.includes('private')) return '/icons/pe.svg';
-            if (n.includes('nic') || t.includes('network interface')) return '/icons/nic.svg';
-            if (n.includes('vm') || t.includes('virtual machine')) return '/icons/10021-icon-service-Virtual-Machine.svg';
-            if (n.includes('db') || t.includes('sql')) return '/icons/db.svg';
+            if (n.includes('avd') || n.includes('desktop') || t.includes('virtual machine') || n.includes('vm')) return '/icons/avd.svg';
+            if (n.includes('pe') || n.includes('private') || t.includes('private')) return '/icons/privateendpoint.svg';
+            if (n.includes('sql') || t.includes('database') || n.includes('db')) return '/icons/sql.svg';
             
-            return '/icons/default.svg';
+            // 2. Fallback voor alles wat overblijft (en expliciete NICs)
+            return '/icons/nic.svg';
         }
 
-        // --- CORE LOADERS (MET PAGINATIE) ---
+        // --- CORE LOADERS ---
         async function loadSubs() {
             const res = await fetch('/api/subscriptions');
             if(res.ok) {
@@ -224,9 +220,8 @@
         async function loadAssets(page = 1) {
             const limit = document.getElementById('limitSelect').value;
             const query = document.getElementById('searchBar').value;
-            currentPage = page; // Update global state
+            currentPage = page;
 
-            // Bouw URL
             let url = `/api/assets?limit=${limit}&page=${page}`; 
             if(query) url += `&q=${encodeURIComponent(query)}`;
             
@@ -236,10 +231,9 @@
             const res = await fetch(url);
             if(res.status === 401) return window.location.href='/login.html';
             
-            // Verwerk nieuwe JSON structuur { data: [...], meta: { ... } }
             const response = await res.json();
             
-            allAssets = response.data; // Opslaan voor gebruik in modals
+            allAssets = response.data;
             totalPages = response.meta.pages || 1;
 
             renderTable(allAssets);
@@ -250,18 +244,11 @@
         function renderPagination() {
             const nav = document.getElementById('paginationControls');
             nav.innerHTML = '';
-
-            // Als er maar 1 pagina is, hoeven we niets te tonen
             if(totalPages <= 1) return;
 
-            // Vorige Knop
             const prevDisabled = currentPage === 1 ? 'disabled' : '';
             nav.innerHTML += `<li class="page-item ${prevDisabled}"><a class="page-link" href="#" onclick="changePage(${currentPage - 1})">Vorige</a></li>`;
 
-            // Pagina Nummers (Simpel: Toon alles, of max 10. Voor nu: toon alles)
-            // Bij grote aantallen kan dit slimmer (1, 2, ..., 99, 100), maar laten we het simpel houden.
-            // Beperking tot max 7 knoppen om UI netjes te houden:
-            
             let startPage = Math.max(1, currentPage - 3);
             let endPage = Math.min(totalPages, startPage + 6);
             if(endPage - startPage < 6) startPage = Math.max(1, endPage - 6);
@@ -281,7 +268,6 @@
                 nav.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="changePage(${totalPages})">${totalPages}</a></li>`;
             }
 
-            // Volgende Knop
             const nextDisabled = currentPage === totalPages ? 'disabled' : '';
             nav.innerHTML += `<li class="page-item ${nextDisabled}"><a class="page-link" href="#" onclick="changePage(${currentPage + 1})">Volgende</a></li>`;
         }
@@ -293,11 +279,11 @@
 
         function handleSearch() { 
             clearTimeout(searchTimeout); 
-            searchTimeout = setTimeout(() => loadAssets(1), 300); // Reset naar pagina 1 bij zoeken
+            searchTimeout = setTimeout(() => loadAssets(1), 300);
         }
         
         function changeLimit() { 
-            loadAssets(1); // Reset naar pagina 1 bij limiet wijziging
+            loadAssets(1);
         }
 
         // --- RENDER TABLE ---
@@ -344,53 +330,7 @@
             });
         }
 
-        // --- EXPORT (Updated to fetch ALL) ---
-        async function exportCSV() {
-            // We moeten expliciet limit=all vragen omdat de normale loadAssets gepagineerd is
-            const res = await fetch('/api/assets?limit=all'); 
-            if(!res.ok) return alert('Fout'); 
-            const json = await res.json(); 
-            const data = json.data; // Let op: .data property!
-
-            if(!data.length) return alert("Geen data.");
-            
-            const headers = ["ID", "Naam", "Type", "IP Adressen", "Subscriptie", "Eigenaar", "CIS Score", "Classificatie", "Gevoeligheid", "Vuln Count"];
-            let csv = headers.join(",") + "\n";
-            data.forEach(a => {
-                const subObj = allSubs.find(s => s.guid === a.subscription_id); const subName = subObj ? subObj.name : a.subscription_id;
-                const ips = (a.ips && a.ips.length > 0) ? a.ips.join(";") : a.ip_address;
-                const row = [a.id, `"${a.name}"`, `"${a.type}"`, `"${ips}"`, `"${subName}"`, `"${a.owner_contact}"`, a.cis_score||0, a.classification, `"${(a.data_sensitivity||'').replace(/,/g,';')}"`, a.vuln_count];
-                csv += row.join(",") + "\n";
-            });
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `assets_export_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(link); link.click(); document.body.removeChild(link);
-        }
-
-        // --- OVERIGE FUNCTIES (Details, Modals, etc. ongewijzigd maar essentieel) ---
-        function toggleGlobalReveal() {
-            isGlobalRevealed = !isGlobalRevealed;
-            const btn = document.getElementById('globalEyeBtn'); const icon = btn.querySelector('i');
-            if (isGlobalRevealed) { btn.className='btn btn-warning'; icon.className='bi bi-eye-slash'; } else { btn.className='btn btn-outline-secondary'; icon.className='bi bi-eye'; }
-            document.querySelectorAll('.masked-data').forEach(el => el.classList.toggle('revealed', isGlobalRevealed));
-        }
-
-        async function openDetailModal(id, name) {
-            currentAssetId = id; document.getElementById('detailTitle').innerText = `Details voor: ${name}`;
-            try {
-                const res = await fetch(`/api/asset-details?id=${id}`); const data = await res.json();
-                currentRelationships = data.relationships;
-                
-                const vT = document.getElementById('vulnTable'); vT.innerHTML=''; data.vulnerabilities.forEach(v => vT.innerHTML+=`<tr><td>${v.name}</td><td>${v.severity}</td><td>${v.status}</td><td>${v.due_date||'-'}</td><td><i class="bi bi-trash text-danger" onclick="deleteDetail('vuln',${v.id})"></i></td></tr>`);
-                const cT = document.getElementById('cisTable'); cT.innerHTML=''; data.cis.forEach(c => cT.innerHTML+=`<tr><td>${c.control_id}</td><td>${c.description}</td><td>${c.justification}</td><td><i class="bi bi-trash text-danger" onclick="deleteDetail('cis',${c.id})"></i></td></tr>`);
-                const hT = document.getElementById('histTable'); hT.innerHTML=''; data.history.forEach(h => hT.innerHTML+=`<tr><td>${new Date(h.timestamp).toLocaleString()}</td><td>${h.changed_by}</td><td>${h.change_type}</td></tr>`);
-                
-                await loadAssetDropdown();
-                const rdT = document.getElementById('relDownTable'); rdT.innerHTML = ''; data.relationships.downstream.forEach(r => rdT.innerHTML += `<tr><td>${r.relation_type} <span class="fw-bold">${r.name}</span></td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
-                const ruT = document.getElementById('relUpTable'); ruT.innerHTML = ''; data.relationships.upstream.forEach(r => ruT.innerHTML += `<tr><td><span class="fw-bold">${r.name}</span> ${r.relation_type} deze asset</td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
-                
-                new bootstrap.Modal(document.getElementById('detailModal')).show();
-            } catch(e) { console.error(e); alert("Details fout"); }
-        }
-
+        // --- NETWORK GRAPH ---
         function openNetworkModal() {
             if(!currentRelationships) return alert("Geen data");
             new bootstrap.Modal(document.getElementById('networkModal')).show();
@@ -401,17 +341,20 @@
             const nodes = []; const edges = [];
             const currentName = document.getElementById('detailTitle').innerText.replace('Details voor: ', '');
             
-            const currentAsset = allAssets.find(a => a.id == currentAssetId) || { name: currentName, type: '' }; // Fallback
+            // Centraal
+            const currentAsset = allAssets.find(a => a.id == currentAssetId) || { name: currentName, type: '' };
             const currentImg = getAssetImage(currentName, currentAsset.type);
 
             nodes.push({ id: currentAssetId, label: currentName, shape: 'image', image: currentImg, size: 30, font: { color: '#000', multi: true, bold: true } });
             
+            // Downstream
             currentRelationships.downstream.forEach(r => {
                 const img = getAssetImage(r.name, '');
                 nodes.push({ id: r.linked_asset_id, label: r.name, shape: 'image', image: img });
                 edges.push({ from: currentAssetId, to: r.linked_asset_id, label: r.relation_type, arrows: 'to' });
             });
             
+            // Upstream
             currentRelationships.upstream.forEach(r => {
                 if(!nodes.find(n => n.id === r.linked_asset_id)) {
                     const img = getAssetImage(r.name, '');
@@ -432,6 +375,40 @@
             const link = document.createElement('a'); link.download = `network_map_${currentAssetId}.png`; link.href = canvas.toDataURL(); link.click();
         }
 
+        // --- EXPORT ---
+        async function exportCSV() {
+            const res = await fetch('/api/assets?limit=all'); if(!res.ok) return alert('Fout'); const json = await res.json(); const data = json.data;
+            if(!data.length) return alert("Geen data.");
+            const headers = ["ID", "Naam", "Type", "IP Adressen", "Subscriptie", "Eigenaar", "CIS Score", "Classificatie", "Gevoeligheid", "Vuln Count"];
+            let csv = headers.join(",") + "\n";
+            data.forEach(a => {
+                const subObj = allSubs.find(s => s.guid === a.subscription_id); const subName = subObj ? subObj.name : a.subscription_id;
+                const ips = (a.ips && a.ips.length > 0) ? a.ips.join(";") : a.ip_address;
+                const row = [a.id, `"${a.name}"`, `"${a.type}"`, `"${ips}"`, `"${subName}"`, `"${a.owner_contact}"`, a.cis_score||0, a.classification, `"${(a.data_sensitivity||'').replace(/,/g,';')}"`, a.vuln_count];
+                csv += row.join(",") + "\n";
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `assets_export_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
+
+        // --- DETAILS / RELATIES ---
+        async function openDetailModal(id, name) {
+            currentAssetId = id; document.getElementById('detailTitle').innerText = `Details voor: ${name}`;
+            try {
+                const res = await fetch(`/api/asset-details?id=${id}`); const data = await res.json();
+                currentRelationships = data.relationships;
+                
+                const vT = document.getElementById('vulnTable'); vT.innerHTML=''; data.vulnerabilities.forEach(v => vT.innerHTML+=`<tr><td>${v.name}</td><td>${v.severity}</td><td>${v.status}</td><td>${v.due_date||'-'}</td><td><i class="bi bi-trash text-danger" onclick="deleteDetail('vuln',${v.id})"></i></td></tr>`);
+                const cT = document.getElementById('cisTable'); cT.innerHTML=''; data.cis.forEach(c => cT.innerHTML+=`<tr><td>${c.control_id}</td><td>${c.description}</td><td>${c.justification}</td><td><i class="bi bi-trash text-danger" onclick="deleteDetail('cis',${c.id})"></i></td></tr>`);
+                const hT = document.getElementById('histTable'); hT.innerHTML=''; data.history.forEach(h => hT.innerHTML+=`<tr><td>${new Date(h.timestamp).toLocaleString()}</td><td>${h.changed_by}</td><td>${h.change_type}</td></tr>`);
+                
+                await loadAssetDropdown();
+                const rdT = document.getElementById('relDownTable'); rdT.innerHTML = ''; data.relationships.downstream.forEach(r => rdT.innerHTML += `<tr><td>${r.relation_type} <span class="fw-bold">${r.name}</span></td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
+                const ruT = document.getElementById('relUpTable'); ruT.innerHTML = ''; data.relationships.upstream.forEach(r => ruT.innerHTML += `<tr><td><span class="fw-bold">${r.name}</span> ${r.relation_type} deze asset</td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
+                
+                new bootstrap.Modal(document.getElementById('detailModal')).show();
+            } catch(e) { console.error(e); alert("Details fout"); }
+        }
+
         async function loadAssetDropdown() {
             const res = await fetch('/api/asset-details?type=list'); const list = await res.json();
             const sel = document.getElementById('rTarget'); sel.innerHTML = '<option value="">Selecteer asset...</option>';
@@ -442,6 +419,7 @@
         async function addVuln() { const body = { type: 'vuln', asset_id: currentAssetId, name: document.getElementById('vName').value, severity: document.getElementById('vSev').value, status: document.getElementById('vStat').value, due_date: document.getElementById('vDate').value }; await fetch('/api/asset-details', { method: 'POST', body: JSON.stringify(body) }); document.getElementById('vulnForm').reset(); openDetailModal(currentAssetId, document.getElementById('detailTitle').innerText.replace('Details voor: ', '')); loadAssets(currentPage); }
         async function addCis() { const body = { type: 'cis', asset_id: currentAssetId, control_id: document.getElementById('cId').value, description: document.getElementById('cDesc').value, justification: document.getElementById('cJust').value }; await fetch('/api/asset-details', { method: 'POST', body: JSON.stringify(body) }); document.getElementById('cisForm').reset(); openDetailModal(currentAssetId, document.getElementById('detailTitle').innerText.replace('Details voor: ', '')); }
 
+        // --- ASSET CRUD / IMPORT ---
         function openCreateModal() { document.getElementById('assetForm').reset(); document.getElementById('assetId').value = ''; document.getElementById('modalTitle').innerText='Nieuwe Asset'; new bootstrap.Modal(document.getElementById('assetModal')).show(); }
         function openEditModal(id) { const a = allAssets.find(x => x.id === id); document.getElementById('assetId').value=id; document.getElementById('name').value=a.name; document.getElementById('type').value=a.type; document.getElementById('cis').value=a.cis_score; document.getElementById('subSelect').value=a.subscription_id; document.getElementById('owner').value=a.owner_contact; document.getElementById('ip').value=(a.ips||[a.ip_address]).join(', '); document.getElementById('classif').value=a.classification; document.querySelectorAll('.sens-check').forEach(c => c.checked=(a.data_sensitivity||'').includes(c.value)); document.getElementById('modalTitle').innerText='Bewerken'; new bootstrap.Modal(document.getElementById('assetModal')).show(); }
         async function saveAsset() { const id = document.getElementById('assetId').value; const sens=[]; document.querySelectorAll('.sens-check:checked').forEach(c=>sens.push(c.value)); const body = { id:id?id:null, name:document.getElementById('name').value, type:document.getElementById('type').value, cis_score:document.getElementById('cis').value, subscription_id:document.getElementById('subSelect').value, owner_contact:document.getElementById('owner').value, ip_address:document.getElementById('ip').value, classification:document.getElementById('classif').value, data_sensitivity:sens }; const r = await fetch('/api/assets', {method:id?'PUT':'POST', body:JSON.stringify(body)}); if(r.ok) { bootstrap.Modal.getInstance(document.getElementById('assetModal')).hide(); loadAssets(currentPage); } else alert(await r.text()); }
@@ -450,6 +428,13 @@
         function analyzeCSV() { const file = document.getElementById('csvFile').files[0]; if(!file) return alert('Kies bestand'); const reader = new FileReader(); reader.onload=async(e)=>{ const rows=csvToJSON(e.target.result); if(!rows.length) return alert('Geen data'); const r=await fetch('/api/import-handler', {method:'POST', body:JSON.stringify({mode:'check', type:'assets', data:rows})}); const d=await r.json(); importData.new=d.new; document.getElementById('countNew').innerText=d.new.length; document.getElementById('listNew').innerHTML=d.new.map(i=>`<tr><td>${i.name}</td></tr>`).join(''); document.getElementById('importPreview').classList.remove('d-none'); document.getElementById('btnConfirmImport').disabled=!d.new.length; }; reader.readAsText(file); }
         async function executeImport() { if(!confirm('Start?')) return; const r=await fetch('/api/import-handler', {method:'POST', body:JSON.stringify({mode:'execute', type:'assets', data:importData.new})}); if(r.ok) { alert('Klaar'); bootstrap.Modal.getInstance(document.getElementById('importModal')).hide(); loadAssets(currentPage); } }
         function csvToJSON(csv) { const lines=csv.split(/\r?\n/); if(lines.length<1) return []; const h=lines[0].split(',').map(x=>x.trim().replace(/^"|"$/g,'').replace(/^\uFEFF/,'')); const res=[]; for(let i=1;i<lines.length;i++){ if(!lines[i].trim()) continue; const l=lines[i].split(','); const o={}; for(let j=0;j<h.length;j++) o[h[j]]=l[j]?l[j].trim().replace(/^"|"$/g,''):''; res.push(o); } return res; }
+        
+        function toggleGlobalReveal() {
+            isGlobalRevealed = !isGlobalRevealed;
+            const btn = document.getElementById('globalEyeBtn'); const icon = btn.querySelector('i');
+            if (isGlobalRevealed) { btn.className='btn btn-warning'; icon.className='bi bi-eye-slash'; } else { btn.className='btn btn-outline-secondary'; icon.className='bi bi-eye'; }
+            document.querySelectorAll('.masked-data').forEach(el => el.classList.toggle('revealed', isGlobalRevealed));
+        }
     </script>
 </body>
 </html>
