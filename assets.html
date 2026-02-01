@@ -9,8 +9,20 @@
         .confidential { border-left: 5px solid #dc3545; background-color: #fffbfb; }
         .internal { border-left: 5px solid #ffc107; }
         .public { border-left: 5px solid #198754; }
-        .masked-data { filter: blur(5px); cursor: pointer; transition: 0.2s; user-select: none; display:inline-block; }
-        .masked-data:hover, .masked-data.revealed { filter: none; }
+        
+        /* De stijl voor verborgen data */
+        .masked-data { 
+            filter: blur(5px); 
+            cursor: pointer; 
+            transition: 0.2s; 
+            user-select: none; 
+            display: inline-block; 
+        }
+        /* Als we erover hoveren OF als de class 'revealed' is toegevoegd */
+        .masked-data:hover, .masked-data.revealed { 
+            filter: none; 
+        }
+        
         .clickable-asset { cursor: pointer; color: #0d6efd; font-weight: bold; text-decoration: underline; }
     </style>
 </head>
@@ -28,8 +40,15 @@
 
     <div class="container-fluid px-4">
         <div class="d-flex justify-content-between mb-3 align-items-center">
-            <button class="btn btn-primary" onclick="openCreateModal()"><i class="bi bi-plus-lg"></i> Nieuwe Asset</button>
+            <button class="btn btn-primary" onclick="openCreateModal()">
+                <i class="bi bi-plus-lg"></i> Nieuwe Asset
+            </button>
+            
             <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary" onclick="toggleGlobalReveal()" id="globalEyeBtn" title="Toon/Verberg alle gevoelige data">
+                    <i class="bi bi-eye"></i>
+                </button>
+                
                 <input type="text" id="searchBar" class="form-control" placeholder="Zoeken..." onkeyup="filterTable()">
             </div>
         </div>
@@ -112,7 +131,7 @@
                     <div class="tab-content p-3">
                         <div class="tab-pane fade show active" id="tabVuln">
                             <form id="vulnForm" class="row g-2 mb-3 bg-light p-2 border rounded">
-                                <div class="col-md-3"><input type="text" id="vName" class="form-control form-control-sm" placeholder="Kwetsbaarheid (bv Log4j)"></div>
+                                <div class="col-md-3"><input type="text" id="vName" class="form-control form-control-sm" placeholder="Kwetsbaarheid"></div>
                                 <div class="col-md-2"><select id="vSev" class="form-select form-select-sm"><option>Critical</option><option>High</option><option>Medium</option></select></div>
                                 <div class="col-md-3"><select id="vStat" class="form-select form-select-sm"><option>Open</option><option>Tijdelijke Uitzondering</option><option>Permanente Uitzondering</option></select></div>
                                 <div class="col-md-2"><input type="date" id="vDate" class="form-control form-control-sm"></div>
@@ -126,9 +145,9 @@
 
                         <div class="tab-pane fade" id="tabCis">
                             <form id="cisForm" class="row g-2 mb-3 bg-light p-2 border rounded">
-                                <div class="col-md-2"><input type="text" id="cId" class="form-control form-control-sm" placeholder="ID (1.1.4)"></div>
+                                <div class="col-md-2"><input type="text" id="cId" class="form-control form-control-sm" placeholder="ID"></div>
                                 <div class="col-md-5"><input type="text" id="cDesc" class="form-control form-control-sm" placeholder="Omschrijving"></div>
-                                <div class="col-md-3"><input type="text" id="cJust" class="form-control form-control-sm" placeholder="Reden voor uitzondering"></div>
+                                <div class="col-md-3"><input type="text" id="cJust" class="form-control form-control-sm" placeholder="Reden"></div>
                                 <div class="col-md-2"><button type="button" onclick="addCis()" class="btn btn-sm btn-success w-100">Toevoegen</button></div>
                             </form>
                             <table class="table table-sm table-striped">
@@ -153,28 +172,58 @@
     <script>
         let allAssets = [];
         let currentAssetId = null;
+        let isGlobalRevealed = false; // Houdt bij of het oogje 'aan' staat
 
         // --- INIT ---
         loadSubs();
         loadAssets();
 
-        // --- 1. DATA LOADING ---
+        // --- GLOBAL REVEAL FUNCTION ---
+        function toggleGlobalReveal() {
+            isGlobalRevealed = !isGlobalRevealed; // Wissel status
+            
+            const btn = document.getElementById('globalEyeBtn');
+            const icon = btn.querySelector('i');
+            
+            // Verander knop uiterlijk
+            if (isGlobalRevealed) {
+                btn.classList.remove('btn-outline-secondary');
+                btn.classList.add('btn-warning');
+                icon.classList.remove('bi-eye');
+                icon.classList.add('bi-eye-slash');
+            } else {
+                btn.classList.remove('btn-warning');
+                btn.classList.add('btn-outline-secondary');
+                icon.classList.remove('bi-eye-slash');
+                icon.classList.add('bi-eye');
+            }
+
+            // Update alle velden die nu op het scherm staan
+            document.querySelectorAll('.masked-data').forEach(el => {
+                if (isGlobalRevealed) el.classList.add('revealed');
+                else el.classList.remove('revealed');
+            });
+        }
+
+        // --- DATA LOADING ---
         async function loadAssets() {
             const res = await fetch('/api/assets');
-            if(res.status === 401) window.location.href = '/login.html';
+            if(res.status === 401) { window.location.href = '/login.html'; return; }
             allAssets = await res.json();
             renderTable(allAssets);
         }
 
         async function loadSubs() {
             const res = await fetch('/api/subscriptions');
-            const subs = await res.json();
-            const sel = document.getElementById('subSelect');
-            sel.innerHTML = '<option value="">Kies...</option>';
-            subs.forEach(s => sel.innerHTML += `<option value="${s.name}">${s.name}</option>`);
+            if(res.ok) {
+                const subs = await res.json();
+                const sel = document.getElementById('subSelect');
+                sel.innerHTML = '<option value="">Kies...</option>';
+                subs.forEach(s => sel.innerHTML += `<option value="${s.name}">${s.name}</option>`);
+            }
         }
 
-        // --- 2. RENDER MAIN TABLE ---
+        // --- RENDER TABLE ---
         function renderTable(data) {
             const tbody = document.getElementById('assetTable');
             tbody.innerHTML = '';
@@ -186,9 +235,10 @@
 
                 let cisColor = a.cis_score < 50 ? 'text-danger fw-bold' : (a.cis_score < 70 ? 'text-warning' : 'text-success');
                 let vulnBadge = a.vuln_count > 0 ? `<span class="badge bg-danger">${a.vuln_count}</span>` : `<span class="badge bg-success">0</span>`;
-
-                // Split columns logic
                 const labels = a.data_sensitivity ? a.data_sensitivity.split(',').map(l => `<span class="badge bg-secondary me-1">${l}</span>`).join('') : '-';
+
+                // Als het globale oogje aan staat, moeten nieuwe rijen ook direct zichtbaar zijn
+                const revealedClass = isGlobalRevealed ? 'revealed' : '';
 
                 tbody.innerHTML += `
                     <tr class="${rowClass}">
@@ -196,9 +246,9 @@
                             <span class="clickable-asset" onclick="openDetailModal(${a.id}, '${a.name}')">${a.name}</span><br>
                             <small class="text-muted">${a.type}</small>
                         </td>
-                        <td><span class="masked-data" onclick="this.classList.toggle('revealed')">${a.ip_address}</span></td>
-                        <td><span class="masked-data" onclick="this.classList.toggle('revealed')">${a.subscription_id}</span></td>
-                        <td><span class="masked-data" onclick="this.classList.toggle('revealed')">${a.owner_contact}</span></td>
+                        <td><span class="masked-data ${revealedClass}" onclick="this.classList.toggle('revealed')">${a.ip_address}</span></td>
+                        <td><span class="masked-data ${revealedClass}" onclick="this.classList.toggle('revealed')">${a.subscription_id}</span></td>
+                        <td><span class="masked-data ${revealedClass}" onclick="this.classList.toggle('revealed')">${a.owner_contact}</span></td>
                         <td>${labels}</td>
                         <td class="${cisColor}">${a.cis_score || 0}%</td>
                         <td>${vulnBadge}</td>
@@ -212,46 +262,60 @@
             });
         }
 
-        // --- 3. DETAIL MODAL LOGIC ---
+        // --- DETAIL MODAL LOGIC (Met Error Handling) ---
         async function openDetailModal(id, name) {
             currentAssetId = id;
             document.getElementById('detailTitle').innerText = `Details voor: ${name}`;
             
-            // Laad details
-            const res = await fetch(`/api/asset-details?id=${id}`);
-            const data = await res.json();
-            
-            // Render Vulns
-            const vTable = document.getElementById('vulnTable');
-            vTable.innerHTML = '';
-            data.vulnerabilities.forEach(v => {
-                vTable.innerHTML += `
-                    <tr>
-                        <td>${v.name}</td>
-                        <td><span class="badge bg-${v.severity === 'Critical' ? 'danger' : 'warning'}">${v.severity}</span></td>
-                        <td>${v.status}</td>
-                        <td>${v.due_date || '-'}</td>
-                        <td><i class="bi bi-trash text-danger" style="cursor:pointer" onclick="deleteDetail('vuln', ${v.id})"></i></td>
-                    </tr>`;
-            });
+            try {
+                const res = await fetch(`/api/asset-details?id=${id}`);
+                
+                // HIER controleren we of de API wel bestaat/JSON teruggeeft
+                if(res.headers.get("content-type") && res.headers.get("content-type").includes("text/html")) {
+                    alert("Fout: De API 'asset-details' kon niet worden geladen (HTML ontvangen). Check of functions/api/asset-details.js bestaat!");
+                    return;
+                }
+                if(!res.ok) { alert("API Fout: " + res.status); return; }
 
-            // Render CIS
-            const cTable = document.getElementById('cisTable');
-            cTable.innerHTML = '';
-            data.cis.forEach(c => {
-                cTable.innerHTML += `<tr><td>${c.control_id}</td><td>${c.description}</td><td>${c.justification}</td><td><i class="bi bi-trash text-danger" style="cursor:pointer" onclick="deleteDetail('cis', ${c.id})"></i></td></tr>`;
-            });
+                const data = await res.json();
+                
+                // Render Vulns
+                const vTable = document.getElementById('vulnTable');
+                vTable.innerHTML = '';
+                data.vulnerabilities.forEach(v => {
+                    vTable.innerHTML += `
+                        <tr>
+                            <td>${v.name}</td>
+                            <td><span class="badge bg-${v.severity === 'Critical' ? 'danger' : 'warning'}">${v.severity}</span></td>
+                            <td>${v.status}</td>
+                            <td>${v.due_date || '-'}</td>
+                            <td><i class="bi bi-trash text-danger" style="cursor:pointer" onclick="deleteDetail('vuln', ${v.id})"></i></td>
+                        </tr>`;
+                });
 
-            // Render History
-            const hTable = document.getElementById('histTable');
-            hTable.innerHTML = '';
-            data.history.forEach(h => {
-                hTable.innerHTML += `<tr><td>${new Date(h.timestamp).toLocaleString()}</td><td>${h.changed_by}</td><td>${h.change_type}</td></tr>`;
-            });
+                // Render CIS
+                const cTable = document.getElementById('cisTable');
+                cTable.innerHTML = '';
+                data.cis.forEach(c => {
+                    cTable.innerHTML += `<tr><td>${c.control_id}</td><td>${c.description}</td><td>${c.justification}</td><td><i class="bi bi-trash text-danger" style="cursor:pointer" onclick="deleteDetail('cis', ${c.id})"></i></td></tr>`;
+                });
 
-            new bootstrap.Modal(document.getElementById('detailModal')).show();
+                // Render History
+                const hTable = document.getElementById('histTable');
+                hTable.innerHTML = '';
+                data.history.forEach(h => {
+                    hTable.innerHTML += `<tr><td>${new Date(h.timestamp).toLocaleString()}</td><td>${h.changed_by}</td><td>${h.change_type}</td></tr>`;
+                });
+
+                new bootstrap.Modal(document.getElementById('detailModal')).show();
+
+            } catch (e) {
+                console.error(e);
+                alert("Er ging iets mis bij het openen van de details. Zie console.");
+            }
         }
 
+        // --- OVERIGE FUNCTIES (ADD/DELETE) ---
         async function addVuln() {
             const body = {
                 type: 'vuln', asset_id: currentAssetId,
@@ -262,8 +326,8 @@
             };
             await fetch('/api/asset-details', { method: 'POST', body: JSON.stringify(body) });
             document.getElementById('vulnForm').reset();
-            openDetailModal(currentAssetId, document.getElementById('detailTitle').innerText.replace('Details voor: ', '')); // Reload
-            loadAssets(); // Update count in main table
+            openDetailModal(currentAssetId, document.getElementById('detailTitle').innerText.replace('Details voor: ', ''));
+            loadAssets();
         }
 
         async function addCis() {
@@ -275,19 +339,18 @@
             };
             await fetch('/api/asset-details', { method: 'POST', body: JSON.stringify(body) });
             document.getElementById('cisForm').reset();
-            openDetailModal(currentAssetId, document.getElementById('detailTitle').innerText.replace('Details voor: ', '')); // Reload
+            openDetailModal(currentAssetId, document.getElementById('detailTitle').innerText.replace('Details voor: ', ''));
         }
 
         async function deleteDetail(type, id) {
             if(!confirm("Verwijderen?")) return;
             await fetch('/api/asset-details', { method: 'DELETE', body: JSON.stringify({type, id}) });
-            // Reload modal data
             const name = document.getElementById('detailTitle').innerText.replace('Details voor: ', '');
             openDetailModal(currentAssetId, name);
             loadAssets();
         }
 
-        // --- 4. CREATE / EDIT / DELETE ASSET (Kort gehouden) ---
+        // --- ASSET MODAL FUNCTIES ---
         function openCreateModal() {
             document.getElementById('assetForm').reset();
             document.getElementById('assetId').value = ''; 
@@ -305,9 +368,7 @@
             document.getElementById('owner').value = asset.owner_contact;
             document.getElementById('ip').value = asset.ip_address;
             document.getElementById('classif').value = asset.classification;
-            // Checkboxes resetten en zetten
             document.querySelectorAll('.sens-check').forEach(c => c.checked = (asset.data_sensitivity || '').includes(c.value));
-            
             document.getElementById('modalTitle').innerText = 'Asset Bewerken';
             new bootstrap.Modal(document.getElementById('assetModal')).show();
         }
@@ -315,7 +376,6 @@
         async function saveAsset() {
             const id = document.getElementById('assetId').value;
             const sens = []; document.querySelectorAll('.sens-check:checked').forEach(c => sens.push(c.value));
-            
             const body = {
                 id: id ? id : null,
                 name: document.getElementById('name').value,
@@ -327,7 +387,6 @@
                 classification: document.getElementById('classif').value,
                 data_sensitivity: sens
             };
-
             const res = await fetch('/api/assets', { method: id ? 'PUT' : 'POST', body: JSON.stringify(body) });
             if(res.ok) {
                 bootstrap.Modal.getInstance(document.getElementById('assetModal')).hide();
