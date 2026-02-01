@@ -201,7 +201,7 @@
                 <div class="modal-header"><h5 class="modal-title" id="detailTitle">Details</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body p-0">
                     <ul class="nav nav-tabs nav-fill bg-light" role="tablist">
-                        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabRisk">⚠️ Risico Matrix</a></li>
+                        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabRisk" data-i18n="tab_risk">⚠️ Risico Matrix</a></li>
                         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabVuln" data-i18n="tab_vuln">🛑 Kwetsbaarheden</a></li>
                         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabCis" data-i18n="tab_cis">✅ CIS</a></li>
                         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabRel" data-i18n="tab_rel">🔗 Relaties</a></li>
@@ -213,31 +213,57 @@
                         <div class="tab-pane fade show active" id="tabRisk">
                             <div class="row">
                                 <div class="col-md-6 border-end">
-                                    <h6 class="text-center mb-3">Impact vs Waarschijnlijkheid</h6>
+                                    <h6 class="text-center mb-3" data-i18n="risk_title">Impact vs Waarschijnlijkheid</h6>
                                     <div class="d-flex justify-content-center align-items-center mb-2">
-                                        <div class="risk-label-y me-2">IMPACT</div>
+                                        <div class="risk-label-y me-2" data-i18n="risk_impact">IMPACT</div>
                                         <div>
                                             <div class="risk-matrix">
-                                                <div></div><div class="risk-header">Low</div><div class="risk-header">Med</div><div class="risk-header">High</div><div class="risk-header">Crit</div>
-                                                <div class="risk-header" style="writing-mode: horizontal-tb; transform: none;">Crit</div>
-                                                <div class="risk-cell risk-med" onclick="setRisk(4,1)" id="r_4_1" title="Impact: Crit, Prob: Low"></div><div class="risk-cell risk-high" onclick="setRisk(4,2)" id="r_4_2" title="Impact: Crit, Prob: Med"></div><div class="risk-cell risk-crit" onclick="setRisk(4,3)" id="r_4_3" title="Impact: Crit, Prob: High"></div><div class="risk-cell risk-crit" onclick="setRisk(4,4)" id="r_4_4" title="Impact: Crit, Prob: Crit"></div>
-                                                <div class="risk-header" style="writing-mode: horizontal-tb; transform: none;">High</div>
-                                                <div class="risk-cell risk-med" onclick="setRisk(3,1)" id="r_3_1"></div><div class="risk-cell risk-med" onclick="setRisk(3,2)" id="r_3_2"></div><div class="risk-cell risk-high" onclick="setRisk(3,3)" id="r_3_3"></div><div class="risk-cell risk-crit" onclick="setRisk(3,4)" id="r_3_4"></div>
-                                                <div class="risk-header" style="writing-mode: horizontal-tb; transform: none;">Med</div>
-                                                <div class="risk-cell risk-low" onclick="setRisk(2,1)" id="r_2_1"></div><div class="risk-cell risk-med" onclick="setRisk(2,2)" id="r_2_2"></div><div class="risk-cell risk-med" onclick="setRisk(2,3)" id="r_2_3"></div><div class="risk-cell risk-high" onclick="setRisk(2,4)" id="r_2_4"></div>
-                                                <div class="risk-header" style="writing-mode: horizontal-tb; transform: none;">Low</div>
-                                                <div class="risk-cell risk-low" onclick="setRisk(1,1)" id="r_1_1"></div><div class="risk-cell risk-low" onclick="setRisk(1,2)" id="r_1_2"></div><div class="risk-cell risk-med" onclick="setRisk(1,3)" id="r_1_3"></div><div class="risk-cell risk-med" onclick="setRisk(1,4)" id="r_1_4"></div>
+                                                <div></div>
+                                                <div class="risk-header" data-i18n="risk_low">Low</div>
+                                                <div class="risk-header" data-i18n="risk_med">Med</div>
+                                                <div class="risk-header" data-i18n="risk_high">High</div>
+                                                <div class="risk-header" data-i18n="risk_crit">Crit</div>
+                                                
+                                                <div class="risk-header" style="writing-mode: horizontal-tb; transform: none;" data-i18n="risk_crit">Crit</div>
+                                                <div class="risk-cell risk-med" onclick="setRisk(4,1)" id="r_4_1" title="Impact: Crit, Prob: Low"></div>
+                                                <div class="risk-cell risk-high" onclick="setRisk(4,2)" id="r_4_2" title="Impact: Crit, Prob: Med"></div>
+                                                <div class="risk-cell risk-crit" onclick="setRisk(4,3)" id="r_4_3" title="Impact: Crit, Prob: High"></div>
+                                                <div class="risk-cell risk-crit" onclick="setRisk(4,4)" id="r_4_4" title="Impact: Crit, Prob: Crit"></div>
+                                                
+                                                <div class="risk-header" style="writing-mode: horizontal-tb; transform: none;" data-i18n="risk_high">High</div>
+                                                <div class="risk-cell risk-med" onclick="setRisk(3,1)" id="r_3_1"></div>
+                                                <div class="risk-cell risk-med" onclick="setRisk(3,2)" id="r_3_2"></div>
+                                                <div class="risk-cell risk-high" onclick="setRisk(3,3)" id="r_3_3"></div>
+                                                <div class="risk-cell risk-crit" onclick="setRisk(3,4)" id="r_3_4"></div>
+                                                
+                                                <div class="risk-header" style="writing-mode: horizontal-tb; transform: none;" data-i18n="risk_med">Med</div>
+                                                <div class="risk-cell risk-low" onclick="setRisk(2,1)" id="r_2_1"></div>
+                                                <div class="risk-cell risk-med" onclick="setRisk(2,2)" id="r_2_2"></div>
+                                                <div class="risk-cell risk-med" onclick="setRisk(2,3)" id="r_2_3"></div>
+                                                <div class="risk-cell risk-high" onclick="setRisk(2,4)" id="r_2_4"></div>
+                                                
+                                                <div class="risk-header" style="writing-mode: horizontal-tb; transform: none;" data-i18n="risk_low">Low</div>
+                                                <div class="risk-cell risk-low" onclick="setRisk(1,1)" id="r_1_1"></div>
+                                                <div class="risk-cell risk-low" onclick="setRisk(1,2)" id="r_1_2"></div>
+                                                <div class="risk-cell risk-med" onclick="setRisk(1,3)" id="r_1_3"></div>
+                                                <div class="risk-cell risk-med" onclick="setRisk(1,4)" id="r_1_4"></div>
                                             </div>
-                                            <div class="text-center mt-2 small fw-bold">WAARSCHIJNLIJKHEID (Likelihood)</div>
+                                            <div class="text-center mt-2 small fw-bold" data-i18n="risk_likelihood">WAARSCHIJNLIJKHEID (Likelihood)</div>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <h6 class="mb-3">Onderbouwing</h6>
+                                    <h6 class="mb-3" data-i18n="risk_justification">Onderbouwing</h6>
                                     <form id="riskForm">
                                         <input type="hidden" id="riskImp"><input type="hidden" id="riskLik">
-                                        <div class="mb-3"><label class="form-label small text-muted">Waarom is dit risico zo ingeschat?</label><textarea id="riskJust" class="form-control" rows="8" placeholder="Beschrijf business impact..."></textarea></div>
-                                        <div class="d-flex justify-content-between align-items-center"><div id="riskScoreDisplay" class="fw-bold text-muted">Score: -</div><button type="button" class="btn btn-success" onclick="saveRisk()">Opslaan</button></div>
+                                        <div class="mb-3">
+                                            <label class="form-label small text-muted" data-i18n="risk_question">Waarom is dit risico zo ingeschat?</label>
+                                            <textarea id="riskJust" class="form-control" rows="8" placeholder="Beschrijf business impact..." data-i18n-ph="risk_placeholder"></textarea>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div id="riskScoreDisplay" class="fw-bold text-muted">Score: -</div>
+                                            <button type="button" class="btn btn-success" onclick="saveRisk()" data-i18n="btn_save">Opslaan</button>
+                                        </div>
                                     </form>
                                 </div>
                             </div>
@@ -251,17 +277,17 @@
                                 <div class="col-md-2"><input type="date" id="vDate" class="form-control form-control-sm"></div>
                                 <div class="col-md-2"><button type="button" onclick="addVuln()" class="btn btn-sm btn-success w-100" data-i18n="btn_add">Toevoegen</button></div>
                             </form>
-                            <table class="table table-sm table-striped"><thead><tr><th data-i18n="th_name">Naam</th><th>Severity</th><th>Status</th><th data-i18n="th_date">Datum</th><th></th></tr></thead><tbody id="vulnTable"></tbody></table>
+                            <table class="table table-sm table-striped"><thead><tr><th data-i18n="th_name">Naam</th><th>Severity</th><th>Status</th><th data-i18n="th_date">Datum</th><th data-i18n="th_action">Actie</th></tr></thead><tbody id="vulnTable"></tbody></table>
                         </div>
 
                         <div class="tab-pane fade" id="tabCis">
                             <form id="cisForm" class="row g-2 mb-3 bg-light p-2 border rounded">
                                 <div class="col-md-2"><input type="text" id="cId" class="form-control form-control-sm" placeholder="ID"></div>
-                                <div class="col-md-5"><input type="text" id="cDesc" class="form-control form-control-sm" placeholder="Beschrijving"></div>
-                                <div class="col-md-3"><input type="text" id="cJust" class="form-control form-control-sm" placeholder="Reden"></div>
+                                <div class="col-md-5"><input type="text" id="cDesc" class="form-control form-control-sm" placeholder="Beschrijving" data-i18n-ph="ph_desc"></div>
+                                <div class="col-md-3"><input type="text" id="cJust" class="form-control form-control-sm" placeholder="Reden" data-i18n-ph="ph_reason"></div>
                                 <div class="col-md-2"><button type="button" onclick="addCis()" class="btn btn-sm btn-success w-100" data-i18n="btn_add">Toevoegen</button></div>
                             </form>
-                            <table class="table table-sm table-striped"><thead><tr><th>ID</th><th data-i18n="th_desc">Beschrijving</th><th data-i18n="th_reason">Reden</th><th></th></tr></thead><tbody id="cisTable"></tbody></table>
+                            <table class="table table-sm table-striped"><thead><tr><th>ID</th><th data-i18n="th_desc">Beschrijving</th><th data-i18n="th_reason">Reden</th><th data-i18n="th_action">Actie</th></tr></thead><tbody id="cisTable"></tbody></table>
                         </div>
 
                         <div class="tab-pane fade" id="tabRel">
@@ -335,14 +361,19 @@
                 th_asset: "Asset", th_ips: "IPs", th_sub: "Subscriptie", th_owner: "Eigenaar", th_labels: "Labels", th_vulns: "Vulns", th_class: "Class", th_action: "Actie", loading: "Laden...",
                 lbl_name: "Naam", lbl_sub: "Subscriptie", lbl_owner: "Eigenaar", lbl_ips: "IP Adres(sen)", lbl_class: "Classificatie", lbl_sens: "Data Gevoeligheid",
                 btn_cancel: "Annuleren", btn_save: "Opslaan", btn_update: "Updaten", btn_add: "Toevoegen", btn_link: "Koppelen", btn_show_network: "Toon Netwerk",
-                tab_vuln: "🛑 Kwetsbaarheden", tab_cis: "✅ CIS", tab_rel: "🔗 Relaties", tab_hist: "🕒 Geschiedenis",
+                tab_vuln: "🛑 Kwetsbaarheden", tab_cis: "✅ CIS", tab_rel: "🔗 Relaties", tab_hist: "🕒 Geschiedenis", tab_risk: "⚠️ Risico Matrix",
                 th_name: "Naam", th_date: "Datum", th_desc: "Beschrijving", th_reason: "Reden", th_time: "Tijd", th_who: "Wie",
                 hdr_downstream: "Afhankelijkheden", hdr_upstream: "Gebruikt door", rel_info: "Koppel assets.", lbl_this_asset: "Deze asset...",
                 modal_network: "Netwerk Overzicht", modal_import: "Importeren", modal_bulk: "Bulk Bewerken", btn_analyze: "Analyseren", tab_new: "Nieuw", btn_start_import: "Start Import",
                 txt_prev: "Vorige", txt_next: "Volgende", txt_no_data: "Geen data", alert_saved: "Opgeslagen", alert_deleted: "Verwijderd", alert_confirm: "Zeker weten?",
                 btn_organize: "Organiseren", btn_stop_organize: "Stop Organiseren", btn_save_layout: "Layout Opslaan", btn_photo: "Foto",
                 lbl_cross_sub: "Cross-Subscription Gedetecteerd!", lbl_current_asset: "Huidige Asset", lbl_downstream: "Downstream", lbl_upstream: "Upstream",
-                lbl_field: "Kies Veld", lbl_value: "Nieuwe Waarde", txt_bulk_msg: "Je bewerkt {n} items."
+                lbl_field: "Kies Veld", lbl_value: "Nieuwe Waarde", txt_bulk_msg: "Je bewerkt {n} items.",
+                // NIEUWE VERTALINGEN VOOR RISK & CIS
+                risk_title: "Impact vs Waarschijnlijkheid", risk_impact: "IMPACT", risk_likelihood: "WAARSCHIJNLIJKHEID (Likelihood)",
+                risk_justification: "Onderbouwing", risk_question: "Waarom is dit risico zo ingeschat?", risk_placeholder: "Beschrijf business impact...",
+                risk_low: "Laag", risk_med: "Middel", risk_high: "Hoog", risk_crit: "Kritiek",
+                ph_desc: "Beschrijving", ph_reason: "Reden", lbl_score: "Score", risk_not_rated: "Nog niet beoordeeld"
             },
             en: {
                 nav_subs: "Subscriptions", nav_audit: "Audit Log", nav_quality: "Data Quality", nav_trends: "Trends", nav_reports: "Reports", btn_dashboard: "Dashboard",
@@ -350,14 +381,19 @@
                 th_asset: "Asset", th_ips: "IPs", th_sub: "Subscription", th_owner: "Owner", th_labels: "Labels", th_vulns: "Vulns", th_class: "Class", th_action: "Action", loading: "Loading...",
                 lbl_name: "Name", lbl_sub: "Subscription", lbl_owner: "Owner", lbl_ips: "IP Address(es)", lbl_class: "Classification", lbl_sens: "Data Sensitivity",
                 btn_cancel: "Cancel", btn_save: "Save", btn_update: "Update", btn_add: "Add", btn_link: "Link", btn_show_network: "Show Network",
-                tab_vuln: "🛑 Vulnerabilities", tab_cis: "✅ CIS", tab_rel: "🔗 Relations", tab_hist: "🕒 History",
+                tab_vuln: "🛑 Vulnerabilities", tab_cis: "✅ CIS", tab_rel: "🔗 Relations", tab_hist: "🕒 History", tab_risk: "⚠️ Risk Matrix",
                 th_name: "Name", th_date: "Date", th_desc: "Description", th_reason: "Reason", th_time: "Time", th_who: "Who",
                 hdr_downstream: "Dependencies", hdr_upstream: "Used by", rel_info: "Link assets.", lbl_this_asset: "This asset...",
                 modal_network: "Network Overview", modal_import: "Import", modal_bulk: "Bulk Edit", btn_analyze: "Analyze", tab_new: "New", btn_start_import: "Start Import",
                 txt_prev: "Previous", txt_next: "Next", txt_no_data: "No data", alert_saved: "Saved", alert_deleted: "Deleted", alert_confirm: "Are you sure?",
                 btn_organize: "Organize", btn_stop_organize: "Stop Organizing", btn_save_layout: "Save Layout", btn_photo: "Photo",
                 lbl_cross_sub: "Cross-Subscription Detected!", lbl_current_asset: "Current Asset", lbl_downstream: "Downstream", lbl_upstream: "Upstream",
-                lbl_field: "Choose Field", lbl_value: "New Value", txt_bulk_msg: "You are editing {n} items."
+                lbl_field: "Choose Field", lbl_value: "New Value", txt_bulk_msg: "You are editing {n} items.",
+                // NEW TRANSLATIONS FOR RISK & CIS
+                risk_title: "Impact vs Likelihood", risk_impact: "IMPACT", risk_likelihood: "LIKELIHOOD",
+                risk_justification: "Justification", risk_question: "Why was this risk assessed this way?", risk_placeholder: "Describe business impact...",
+                risk_low: "Low", risk_med: "Med", risk_high: "High", risk_crit: "Crit",
+                ph_desc: "Description", ph_reason: "Reason", lbl_score: "Score", risk_not_rated: "Not yet rated"
             }
         };
 
@@ -375,6 +411,12 @@
                 const key = el.getAttribute('data-i18n');
                 if(translations[lang][key]) el.innerText = translations[lang][key];
             });
+            // Nieuw: Placeholders vertalen
+            document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+                const key = el.getAttribute('data-i18n-ph');
+                if(translations[lang][key]) el.placeholder = translations[lang][key];
+            });
+            
             document.querySelectorAll('option[data-i18n-val]').forEach(opt => {
                 const key = opt.getAttribute('data-i18n-val');
                 opt.innerText = dataTranslations[lang][key] || key;
@@ -476,7 +518,7 @@
                 const cell = document.getElementById(`r_${riskData.impact}_${riskData.likelihood}`);
                 if(cell) cell.classList.add('selected');
                 updateRiskLabel(riskData.impact, riskData.likelihood);
-            } else document.getElementById('riskScoreDisplay').innerText = "Nog niet beoordeeld";
+            } else document.getElementById('riskScoreDisplay').innerText = t('risk_not_rated');
         }
         function setRisk(imp, lik) {
             document.getElementById('riskImp').value = imp;
@@ -487,8 +529,9 @@
         }
         function updateRiskLabel(imp, lik) {
             const score = imp * lik;
-            let label = "Low"; if(score >= 4) label="Medium"; if(score >= 9) label="High"; if(score >= 12) label="Critical";
-            document.getElementById('riskScoreDisplay').innerHTML = `Score: <span class="badge bg-secondary">${score}</span> (${label})`;
+            let labelKey = "risk_low"; if(score >= 4) labelKey="risk_med"; if(score >= 9) labelKey="risk_high"; if(score >= 12) labelKey="risk_crit";
+            // Dynamisch label ophalen via vertaalfunctie
+            document.getElementById('riskScoreDisplay').innerHTML = `${t('lbl_score')}: <span class="badge bg-secondary">${score}</span> (${t(labelKey)})`;
         }
         async function saveRisk() {
             const imp = document.getElementById('riskImp').value;
@@ -497,7 +540,7 @@
             if(!imp || !lik) return alert("Selecteer een vakje.");
             if(!just) return alert("Vul onderbouwing in.");
             const res = await fetch('/api/asset-details', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ type:'risk', asset_id:currentAssetId, impact:imp, likelihood:lik, justification:just }) });
-            if(res.ok) alert("Risico opgeslagen!"); else alert("Fout.");
+            if(res.ok) alert(t('alert_saved')); else alert("Fout.");
         }
 
         // --- BULK SELECTION ---
