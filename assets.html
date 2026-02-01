@@ -15,7 +15,9 @@
         .masked-data { filter: blur(5px); cursor: pointer; transition: 0.2s; user-select: none; display: inline-block; }
         .masked-data:hover, .masked-data.revealed { filter: none; }
         .clickable-asset { cursor: pointer; color: #0d6efd; font-weight: bold; text-decoration: underline; }
-        #networkGraph { width: 100%; height: 500px; border: 1px solid #ddd; background-color: #f8f9fa; }
+        
+        /* Netwerk Grafiek Stijl */
+        #networkGraph { width: 100%; height: 600px; border: 1px solid #ddd; background-color: #f8f9fa; }
         .asset-icon-img { width: 24px; height: 24px; vertical-align: middle; margin-right: 10px; }
         .pagination { margin-top: 1rem; margin-bottom: 2rem; }
     </style>
@@ -60,9 +62,7 @@
             </div>
         </div>
 
-        <nav aria-label="Page navigation">
-            <ul class="pagination justify-content-center" id="paginationControls"></ul>
-        </nav>
+        <nav aria-label="Page navigation"><ul class="pagination justify-content-center" id="paginationControls"></ul></nav>
     </div>
 
     <div class="modal fade" id="assetModal" tabindex="-1">
@@ -151,10 +151,23 @@
     <div class="modal fade" id="networkModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header bg-dark text-white"><h5 class="modal-title"><i class="bi bi-diagram-2"></i> Netwerk Overzicht</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title"><i class="bi bi-diagram-2"></i> Netwerk Overzicht</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
                 <div class="modal-body p-0 position-relative">
                     <div id="networkGraph"></div>
-                    <div class="position-absolute top-0 end-0 m-3"><button class="btn btn-light shadow-sm border" onclick="exportNetworkImage()"><i class="bi bi-camera"></i> Opslaan</button></div>
+                    <div class="position-absolute top-0 end-0 m-3 d-flex gap-2">
+                        <button class="btn btn-light shadow-sm border btn-sm" onclick="togglePhysics()" id="physBtn" title="Zet 'veren' aan/uit om te organiseren">
+                            <i class="bi bi-play-fill"></i> Organiseren
+                        </button>
+                        <button class="btn btn-light shadow-sm border btn-sm" onclick="exportNetworkImage()">
+                            <i class="bi bi-camera"></i> Opslaan
+                        </button>
+                    </div>
+                    <div class="position-absolute bottom-0 start-0 m-3 small text-muted bg-white p-1 rounded border">
+                        <i class="bi bi-info-circle"></i> Tip: Sleep iconen bij elkaar om groepjes te maken. Ze blijven staan.
+                    </div>
                 </div>
             </div>
         </div>
@@ -179,33 +192,25 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        let allAssets = []; // Bevat nu alleen de data van de HUIDIGE pagina
-        let allSubs = []; let currentAssetId = null; let currentRelationships = null;
+        let allAssets = []; let allSubs = []; let currentAssetId = null; let currentRelationships = null;
         let isGlobalRevealed = false; let importData = { new: [] }; let searchTimeout = null; let networkInstance = null;
-        
-        let currentPage = 1;
-        let totalPages = 1;
+        let currentPage = 1; let totalPages = 1;
 
         // INIT
         loadSubs();
 
-        // --- IMAGE MAPPING (AANGEPAST AAN JOUW BESTANDEN) ---
+        // --- IMAGE MAPPING ---
         function getAssetImage(name, type) {
-            const n = name.toLowerCase();
-            const t = (type || '').toLowerCase();
-            
-            // 1. Specifieke diensten met eigen namen
+            const n = name.toLowerCase(); const t = (type || '').toLowerCase();
             if (n.includes('kv') || n.includes('keyvault')) return '/icons/keyvault.svg';
             if (n.includes('rsv') || n.includes('recovery')) return '/icons/rsv.svg';
             if (n.includes('avd') || n.includes('desktop') || t.includes('virtual machine') || n.includes('vm')) return '/icons/avd.svg';
             if (n.includes('pe') || n.includes('private') || t.includes('private')) return '/icons/privateendpoint.svg';
             if (n.includes('sql') || t.includes('database') || n.includes('db')) return '/icons/sql.svg';
-            
-            // 2. Fallback voor alles wat overblijft (en expliciete NICs)
             return '/icons/nic.svg';
         }
 
-        // --- CORE LOADERS ---
+        // --- LOADERS ---
         async function loadSubs() {
             const res = await fetch('/api/subscriptions');
             if(res.ok) {
@@ -221,76 +226,18 @@
             const limit = document.getElementById('limitSelect').value;
             const query = document.getElementById('searchBar').value;
             currentPage = page;
-
-            let url = `/api/assets?limit=${limit}&page=${page}`; 
-            if(query) url += `&q=${encodeURIComponent(query)}`;
-            
-            const tbody = document.getElementById('assetTable');
-            tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center">Laden...</td></tr>';
-            
+            let url = `/api/assets?limit=${limit}&page=${page}`; if(query) url += `&q=${encodeURIComponent(query)}`;
+            const tbody = document.getElementById('assetTable'); tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center">Laden...</td></tr>';
             const res = await fetch(url);
             if(res.status === 401) return window.location.href='/login.html';
-            
             const response = await res.json();
-            
-            allAssets = response.data;
-            totalPages = response.meta.pages || 1;
-
-            renderTable(allAssets);
-            renderPagination();
+            allAssets = response.data; totalPages = response.meta.pages || 1;
+            renderTable(allAssets); renderPagination();
         }
 
-        // --- PAGINATION UI ---
-        function renderPagination() {
-            const nav = document.getElementById('paginationControls');
-            nav.innerHTML = '';
-            if(totalPages <= 1) return;
-
-            const prevDisabled = currentPage === 1 ? 'disabled' : '';
-            nav.innerHTML += `<li class="page-item ${prevDisabled}"><a class="page-link" href="#" onclick="changePage(${currentPage - 1})">Vorige</a></li>`;
-
-            let startPage = Math.max(1, currentPage - 3);
-            let endPage = Math.min(totalPages, startPage + 6);
-            if(endPage - startPage < 6) startPage = Math.max(1, endPage - 6);
-
-            if(startPage > 1) {
-                nav.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="changePage(1)">1</a></li>`;
-                if(startPage > 2) nav.innerHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
-            }
-
-            for(let i = startPage; i <= endPage; i++) {
-                const active = i === currentPage ? 'active' : '';
-                nav.innerHTML += `<li class="page-item ${active}"><a class="page-link" href="#" onclick="changePage(${i})">${i}</a></li>`;
-            }
-
-            if(endPage < totalPages) {
-                if(endPage < totalPages - 1) nav.innerHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
-                nav.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="changePage(${totalPages})">${totalPages}</a></li>`;
-            }
-
-            const nextDisabled = currentPage === totalPages ? 'disabled' : '';
-            nav.innerHTML += `<li class="page-item ${nextDisabled}"><a class="page-link" href="#" onclick="changePage(${currentPage + 1})">Volgende</a></li>`;
-        }
-
-        function changePage(page) {
-            if(page < 1 || page > totalPages) return;
-            loadAssets(page);
-        }
-
-        function handleSearch() { 
-            clearTimeout(searchTimeout); 
-            searchTimeout = setTimeout(() => loadAssets(1), 300);
-        }
-        
-        function changeLimit() { 
-            loadAssets(1);
-        }
-
-        // --- RENDER TABLE ---
         function renderTable(data) {
             const tbody = document.getElementById('assetTable'); tbody.innerHTML = '';
             if(data.length===0) return tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center">Geen resultaten</td></tr>';
-
             data.forEach(a => {
                 let rCls = a.classification==='Confidential'?'confidential':(a.classification==='Internal'?'internal':'public');
                 let vBadge = a.vuln_count>0?`<span class="badge bg-danger">${a.vuln_count}</span>`:`<span class="badge bg-success">0</span>`;
@@ -298,39 +245,32 @@
                 const subDisp = subObj?subObj.name:a.subscription_id;
                 const ips = a.ips||[]; const ipDisp = (ips[0]||a.ip_address||'') + (ips.length>1?` <span class="badge bg-secondary">+${ips.length-1}</span>`:'');
                 const rev = isGlobalRevealed?'revealed':'';
-
                 let cisDisplay = `<span class="${a.cis_score<50?'text-danger fw-bold':(a.cis_score<70?'text-warning':'text-success')}">${a.cis_score||0}%</span>`;
                 if(a.type === 'Network Interface') cisDisplay = '<span class="text-muted small">N.v.t.</span>';
-
                 const imgUrl = getAssetImage(a.name, a.type);
-
-                tbody.innerHTML += `
-                    <tr class="${rCls}">
-                        <td>
-                            <div class="d-flex align-items-center">
-                                <img src="${imgUrl}" class="asset-icon-img" alt="icon">
-                                <div>
-                                    <span class="clickable-asset" onclick="openDetailModal(${a.id}, '${a.name}')">${a.name}</span><br>
-                                    <small class="text-muted">${a.type}</small>
-                                </div>
-                            </div>
-                        </td>
-                        <td><span class="masked-data ${rev}" onclick="this.classList.toggle('revealed')">${ipDisp}</span></td>
-                        <td><span class="masked-data ${rev}" onclick="this.classList.toggle('revealed')">${subDisp}</span></td>
-                        <td><span class="masked-data ${rev}" onclick="this.classList.toggle('revealed')">${a.owner_contact}</span></td>
-                        <td>${(a.data_sensitivity||'').split(',').map(l=>l?`<span class="badge bg-secondary me-1">${l}</span>`:'').join('')}</td>
-                        <td>${cisDisplay}</td>
-                        <td>${vBadge}</td>
-                        <td>${a.classification}</td>
-                        <td class="text-end">
-                            <button class="btn btn-sm btn-outline-primary" onclick="openEditModal(${a.id})"><i class="bi bi-pencil"></i></button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteAsset(${a.id})"><i class="bi bi-trash"></i></button>
-                        </td>
-                    </tr>`;
+                tbody.innerHTML += `<tr class="${rCls}"><td><div class="d-flex align-items-center"><img src="${imgUrl}" class="asset-icon-img" alt="icon"><div><span class="clickable-asset" onclick="openDetailModal(${a.id}, '${a.name}')">${a.name}</span><br><small class="text-muted">${a.type}</small></div></div></td><td><span class="masked-data ${rev}" onclick="this.classList.toggle('revealed')">${ipDisp}</span></td><td><span class="masked-data ${rev}" onclick="this.classList.toggle('revealed')">${subDisp}</span></td><td><span class="masked-data ${rev}" onclick="this.classList.toggle('revealed')">${a.owner_contact}</span></td><td>${(a.data_sensitivity||'').split(',').map(l=>l?`<span class="badge bg-secondary me-1">${l}</span>`:'').join('')}</td><td>${cisDisplay}</td><td>${vBadge}</td><td>${a.classification}</td><td class="text-end"><button class="btn btn-sm btn-outline-primary" onclick="openEditModal(${a.id})"><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-outline-danger" onclick="deleteAsset(${a.id})"><i class="bi bi-trash"></i></button></td></tr>`;
             });
         }
 
-        // --- NETWORK GRAPH ---
+        function renderPagination() {
+            const nav = document.getElementById('paginationControls'); nav.innerHTML = '';
+            if(totalPages <= 1) return;
+            const prevDisabled = currentPage === 1 ? 'disabled' : '';
+            nav.innerHTML += `<li class="page-item ${prevDisabled}"><a class="page-link" href="#" onclick="changePage(${currentPage - 1})">Vorige</a></li>`;
+            let start = Math.max(1, currentPage - 3); let end = Math.min(totalPages, start + 6);
+            if(end - start < 6) start = Math.max(1, end - 6);
+            if(start > 1) nav.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="changePage(1)">1</a>...</li>`;
+            for(let i=start; i<=end; i++) nav.innerHTML += `<li class="page-item ${i===currentPage?'active':''}"><a class="page-link" href="#" onclick="changePage(${i})">${i}</a></li>`;
+            if(end < totalPages) nav.innerHTML += `<li class="page-item">...<a class="page-link" href="#" onclick="changePage(${totalPages})">${totalPages}</a></li>`;
+            const nextDisabled = currentPage === totalPages ? 'disabled' : '';
+            nav.innerHTML += `<li class="page-item ${nextDisabled}"><a class="page-link" href="#" onclick="changePage(${currentPage + 1})">Volgende</a></li>`;
+        }
+        function changePage(p) { if(p<1||p>totalPages) return; loadAssets(p); }
+        function handleSearch() { clearTimeout(searchTimeout); searchTimeout = setTimeout(() => loadAssets(1), 300); }
+        function changeLimit() { loadAssets(1); }
+        function toggleGlobalReveal() { isGlobalRevealed = !isGlobalRevealed; const btn = document.getElementById('globalEyeBtn'); const icon = btn.querySelector('i'); if (isGlobalRevealed) { btn.className='btn btn-warning'; icon.className='bi bi-eye-slash'; } else { btn.className='btn btn-outline-secondary'; icon.className='bi bi-eye'; } document.querySelectorAll('.masked-data').forEach(el => el.classList.toggle('revealed', isGlobalRevealed)); }
+
+        // --- NETWORK GRAPH (UPDATED) ---
         function openNetworkModal() {
             if(!currentRelationships) return alert("Geen data");
             new bootstrap.Modal(document.getElementById('networkModal')).show();
@@ -344,17 +284,13 @@
             // Centraal
             const currentAsset = allAssets.find(a => a.id == currentAssetId) || { name: currentName, type: '' };
             const currentImg = getAssetImage(currentName, currentAsset.type);
-
-            nodes.push({ id: currentAssetId, label: currentName, shape: 'image', image: currentImg, size: 30, font: { color: '#000', multi: true, bold: true } });
+            nodes.push({ id: currentAssetId, label: currentName, shape: 'image', image: currentImg, size: 40, font: { color: '#000', multi: true, bold: true } });
             
-            // Downstream
             currentRelationships.downstream.forEach(r => {
                 const img = getAssetImage(r.name, '');
                 nodes.push({ id: r.linked_asset_id, label: r.name, shape: 'image', image: img });
                 edges.push({ from: currentAssetId, to: r.linked_asset_id, label: r.relation_type, arrows: 'to' });
             });
-            
-            // Upstream
             currentRelationships.upstream.forEach(r => {
                 if(!nodes.find(n => n.id === r.linked_asset_id)) {
                     const img = getAssetImage(r.name, '');
@@ -365,8 +301,40 @@
 
             const container = document.getElementById('networkGraph');
             const data = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
-            const options = { physics: { enabled: true, stabilization: { iterations: 200 } }, layout: { randomSeed: 2 }, interaction: { zoomView: true, dragView: true }, nodes: { borderWidth: 1, borderWidthSelected: 2, color: { border: '#ddd', background: '#fff' } } };
+            
+            // PHYSICS OPTIES: AAN BIJ START, DAN UIT
+            const options = { 
+                physics: { 
+                    enabled: true, 
+                    stabilization: { iterations: 1000 }, // Laat hem even goed uitrekenen
+                    barnesHut: { gravitationalConstant: -3000 } // Zorg voor spreiding
+                }, 
+                layout: { randomSeed: 2 }, 
+                interaction: { zoomView: true, dragView: true },
+                nodes: { borderWidth: 1, color: { border: '#ccc', background: '#fff' } }
+            };
+            
             networkInstance = new vis.Network(container, data, options);
+
+            // CRUCIAAL: Zet physics UIT zodra hij stabiel is, zodat items niet terugspringen
+            networkInstance.on("stabilizationIterationsDone", function () {
+                networkInstance.setOptions( { physics: false } );
+            });
+            
+            // Voor de zekerheid bij slepen ook physics uit
+            networkInstance.on("dragStart", function (params) {
+                networkInstance.setOptions( { physics: false } );
+            });
+        }
+
+        // Knop om physics weer even aan te zetten
+        function togglePhysics() {
+            if(!networkInstance) return;
+            const current = networkInstance.physics.physicsEnabled;
+            networkInstance.setOptions({ physics: !current });
+            // Icon update
+            const btn = document.getElementById('physBtn');
+            btn.innerHTML = !current ? '<i class="bi bi-pause-fill"></i> Stop Organiseren' : '<i class="bi bi-play-fill"></i> Organiseren';
         }
 
         function exportNetworkImage() {
@@ -375,66 +343,37 @@
             const link = document.createElement('a'); link.download = `network_map_${currentAssetId}.png`; link.href = canvas.toDataURL(); link.click();
         }
 
-        // --- EXPORT ---
-        async function exportCSV() {
-            const res = await fetch('/api/assets?limit=all'); if(!res.ok) return alert('Fout'); const json = await res.json(); const data = json.data;
-            if(!data.length) return alert("Geen data.");
-            const headers = ["ID", "Naam", "Type", "IP Adressen", "Subscriptie", "Eigenaar", "CIS Score", "Classificatie", "Gevoeligheid", "Vuln Count"];
-            let csv = headers.join(",") + "\n";
-            data.forEach(a => {
-                const subObj = allSubs.find(s => s.guid === a.subscription_id); const subName = subObj ? subObj.name : a.subscription_id;
-                const ips = (a.ips && a.ips.length > 0) ? a.ips.join(";") : a.ip_address;
-                const row = [a.id, `"${a.name}"`, `"${a.type}"`, `"${ips}"`, `"${subName}"`, `"${a.owner_contact}"`, a.cis_score||0, a.classification, `"${(a.data_sensitivity||'').replace(/,/g,';')}"`, a.vuln_count];
-                csv += row.join(",") + "\n";
-            });
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `assets_export_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(link); link.click(); document.body.removeChild(link);
-        }
-
-        // --- DETAILS / RELATIES ---
+        // --- DETAILS ---
         async function openDetailModal(id, name) {
             currentAssetId = id; document.getElementById('detailTitle').innerText = `Details voor: ${name}`;
             try {
                 const res = await fetch(`/api/asset-details?id=${id}`); const data = await res.json();
                 currentRelationships = data.relationships;
-                
                 const vT = document.getElementById('vulnTable'); vT.innerHTML=''; data.vulnerabilities.forEach(v => vT.innerHTML+=`<tr><td>${v.name}</td><td>${v.severity}</td><td>${v.status}</td><td>${v.due_date||'-'}</td><td><i class="bi bi-trash text-danger" onclick="deleteDetail('vuln',${v.id})"></i></td></tr>`);
                 const cT = document.getElementById('cisTable'); cT.innerHTML=''; data.cis.forEach(c => cT.innerHTML+=`<tr><td>${c.control_id}</td><td>${c.description}</td><td>${c.justification}</td><td><i class="bi bi-trash text-danger" onclick="deleteDetail('cis',${c.id})"></i></td></tr>`);
                 const hT = document.getElementById('histTable'); hT.innerHTML=''; data.history.forEach(h => hT.innerHTML+=`<tr><td>${new Date(h.timestamp).toLocaleString()}</td><td>${h.changed_by}</td><td>${h.change_type}</td></tr>`);
-                
                 await loadAssetDropdown();
                 const rdT = document.getElementById('relDownTable'); rdT.innerHTML = ''; data.relationships.downstream.forEach(r => rdT.innerHTML += `<tr><td>${r.relation_type} <span class="fw-bold">${r.name}</span></td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
                 const ruT = document.getElementById('relUpTable'); ruT.innerHTML = ''; data.relationships.upstream.forEach(r => ruT.innerHTML += `<tr><td><span class="fw-bold">${r.name}</span> ${r.relation_type} deze asset</td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
-                
                 new bootstrap.Modal(document.getElementById('detailModal')).show();
             } catch(e) { console.error(e); alert("Details fout"); }
         }
-
-        async function loadAssetDropdown() {
-            const res = await fetch('/api/asset-details?type=list'); const list = await res.json();
-            const sel = document.getElementById('rTarget'); sel.innerHTML = '<option value="">Selecteer asset...</option>';
-            list.forEach(item => { if(item.id !== currentAssetId) sel.innerHTML += `<option value="${item.id}">${item.name}</option>`; });
-        }
+        async function loadAssetDropdown() { const res = await fetch('/api/asset-details?type=list'); const list = await res.json(); const sel = document.getElementById('rTarget'); sel.innerHTML = '<option value="">Selecteer asset...</option>'; list.forEach(item => { if(item.id !== currentAssetId) sel.innerHTML += `<option value="${item.id}">${item.name}</option>`; }); }
         async function addRel() { const targetId = document.getElementById('rTarget').value; const type = document.getElementById('rType').value; if(!targetId) return alert("Kies een asset"); await fetch('/api/asset-details', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ type: 'rel', parent_id: currentAssetId, child_id: targetId, relation_type: type }) }); const name = document.getElementById('detailTitle').innerText.replace('Details voor: ', ''); openDetailModal(currentAssetId, name); }
         async function deleteDetail(type, id) { if(!confirm("Verwijderen?")) return; await fetch('/api/asset-details', { method: 'DELETE', body: JSON.stringify({type, id}) }); const name = document.getElementById('detailTitle').innerText.replace('Details voor: ', ''); openDetailModal(currentAssetId, name); if(type !== 'rel') loadAssets(currentPage); }
         async function addVuln() { const body = { type: 'vuln', asset_id: currentAssetId, name: document.getElementById('vName').value, severity: document.getElementById('vSev').value, status: document.getElementById('vStat').value, due_date: document.getElementById('vDate').value }; await fetch('/api/asset-details', { method: 'POST', body: JSON.stringify(body) }); document.getElementById('vulnForm').reset(); openDetailModal(currentAssetId, document.getElementById('detailTitle').innerText.replace('Details voor: ', '')); loadAssets(currentPage); }
         async function addCis() { const body = { type: 'cis', asset_id: currentAssetId, control_id: document.getElementById('cId').value, description: document.getElementById('cDesc').value, justification: document.getElementById('cJust').value }; await fetch('/api/asset-details', { method: 'POST', body: JSON.stringify(body) }); document.getElementById('cisForm').reset(); openDetailModal(currentAssetId, document.getElementById('detailTitle').innerText.replace('Details voor: ', '')); }
 
-        // --- ASSET CRUD / IMPORT ---
+        // --- CRUD / EXPORT / IMPORT ---
         function openCreateModal() { document.getElementById('assetForm').reset(); document.getElementById('assetId').value = ''; document.getElementById('modalTitle').innerText='Nieuwe Asset'; new bootstrap.Modal(document.getElementById('assetModal')).show(); }
         function openEditModal(id) { const a = allAssets.find(x => x.id === id); document.getElementById('assetId').value=id; document.getElementById('name').value=a.name; document.getElementById('type').value=a.type; document.getElementById('cis').value=a.cis_score; document.getElementById('subSelect').value=a.subscription_id; document.getElementById('owner').value=a.owner_contact; document.getElementById('ip').value=(a.ips||[a.ip_address]).join(', '); document.getElementById('classif').value=a.classification; document.querySelectorAll('.sens-check').forEach(c => c.checked=(a.data_sensitivity||'').includes(c.value)); document.getElementById('modalTitle').innerText='Bewerken'; new bootstrap.Modal(document.getElementById('assetModal')).show(); }
         async function saveAsset() { const id = document.getElementById('assetId').value; const sens=[]; document.querySelectorAll('.sens-check:checked').forEach(c=>sens.push(c.value)); const body = { id:id?id:null, name:document.getElementById('name').value, type:document.getElementById('type').value, cis_score:document.getElementById('cis').value, subscription_id:document.getElementById('subSelect').value, owner_contact:document.getElementById('owner').value, ip_address:document.getElementById('ip').value, classification:document.getElementById('classif').value, data_sensitivity:sens }; const r = await fetch('/api/assets', {method:id?'PUT':'POST', body:JSON.stringify(body)}); if(r.ok) { bootstrap.Modal.getInstance(document.getElementById('assetModal')).hide(); loadAssets(currentPage); } else alert(await r.text()); }
         async function deleteAsset(id) { if(confirm('Wissen?')) { await fetch('/api/assets', {method:'DELETE', body:JSON.stringify({id})}); loadAssets(currentPage); } }
+        async function exportCSV() { const res = await fetch('/api/assets?limit=all'); if(!res.ok) return alert('Fout'); const json = await res.json(); const data = json.data; if(!data.length) return alert("Geen data."); const headers = ["ID", "Naam", "Type", "IP Adressen", "Subscriptie", "Eigenaar", "CIS Score", "Classificatie", "Gevoeligheid", "Vuln Count"]; let csv = headers.join(",") + "\n"; data.forEach(a => { const subObj = allSubs.find(s => s.guid === a.subscription_id); const subName = subObj ? subObj.name : a.subscription_id; const ips = (a.ips && a.ips.length > 0) ? a.ips.join(";") : a.ip_address; const row = [a.id, `"${a.name}"`, `"${a.type}"`, `"${ips}"`, `"${subName}"`, `"${a.owner_contact}"`, a.cis_score||0, a.classification, `"${(a.data_sensitivity||'').replace(/,/g,';')}"`, a.vuln_count]; csv += row.join(",") + "\n"; }); const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `assets_export_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(link); link.click(); document.body.removeChild(link); }
         function openImportModal() { document.getElementById('importPreview').classList.add('d-none'); document.getElementById('csvFile').value=''; new bootstrap.Modal(document.getElementById('importModal')).show(); }
         function analyzeCSV() { const file = document.getElementById('csvFile').files[0]; if(!file) return alert('Kies bestand'); const reader = new FileReader(); reader.onload=async(e)=>{ const rows=csvToJSON(e.target.result); if(!rows.length) return alert('Geen data'); const r=await fetch('/api/import-handler', {method:'POST', body:JSON.stringify({mode:'check', type:'assets', data:rows})}); const d=await r.json(); importData.new=d.new; document.getElementById('countNew').innerText=d.new.length; document.getElementById('listNew').innerHTML=d.new.map(i=>`<tr><td>${i.name}</td></tr>`).join(''); document.getElementById('importPreview').classList.remove('d-none'); document.getElementById('btnConfirmImport').disabled=!d.new.length; }; reader.readAsText(file); }
         async function executeImport() { if(!confirm('Start?')) return; const r=await fetch('/api/import-handler', {method:'POST', body:JSON.stringify({mode:'execute', type:'assets', data:importData.new})}); if(r.ok) { alert('Klaar'); bootstrap.Modal.getInstance(document.getElementById('importModal')).hide(); loadAssets(currentPage); } }
         function csvToJSON(csv) { const lines=csv.split(/\r?\n/); if(lines.length<1) return []; const h=lines[0].split(',').map(x=>x.trim().replace(/^"|"$/g,'').replace(/^\uFEFF/,'')); const res=[]; for(let i=1;i<lines.length;i++){ if(!lines[i].trim()) continue; const l=lines[i].split(','); const o={}; for(let j=0;j<h.length;j++) o[h[j]]=l[j]?l[j].trim().replace(/^"|"$/g,''):''; res.push(o); } return res; }
-        
-        function toggleGlobalReveal() {
-            isGlobalRevealed = !isGlobalRevealed;
-            const btn = document.getElementById('globalEyeBtn'); const icon = btn.querySelector('i');
-            if (isGlobalRevealed) { btn.className='btn btn-warning'; icon.className='bi bi-eye-slash'; } else { btn.className='btn btn-outline-secondary'; icon.className='bi bi-eye'; }
-            document.querySelectorAll('.masked-data').forEach(el => el.classList.toggle('revealed', isGlobalRevealed));
-        }
     </script>
 </body>
 </html>
