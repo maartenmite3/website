@@ -100,32 +100,44 @@
             .catch(err => console.error("Kon user niet laden", err));
 
         // 2. Wachtwoord updaten functie
-        async function updatePass() {
-            const passField = document.getElementById('newPass');
-            const newPass = passField.value;
+async function updatePass() {
+    const passField = document.getElementById('newPass');
+    const newPass = passField.value;
+    
+    if(!newPass) {
+        alert("Vul wel iets in!"); 
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/user', { 
+            method: 'PUT', 
+            headers: { 
+                'Content-Type': 'application/json'  // <--- DEZE REGEL WAS DE BOOSDOENER!
+            },
+            body: JSON.stringify({ new_password: newPass }) 
+        });
+
+        if (response.ok) {
+            alert('Wachtwoord succesvol gewijzigd!');
+            passField.value = ''; 
             
-            if(!newPass) {
-                alert("Vul wel iets in!"); 
-                return;
-            }
-
-            try {
-                await fetch('/api/user', { 
-                    method: 'PUT', 
-                    body: JSON.stringify({ new_password: newPass }) 
-                });
-                alert('Wachtwoord succesvol gewijzigd!');
-                passField.value = ''; // Veld leegmaken
-                
-                // Sluit de modal netjes via Bootstrap code
-                const modalEl = document.getElementById('settingsModal');
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                modal.hide();
-
-            } catch (e) {
-                alert('Fout bij opslaan.');
-            }
+            // Sluit de modal
+            const modalEl = document.getElementById('settingsModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            modal.hide();
+        } else {
+            // Lees de foutmelding van de server als die er is
+            const errorText = await response.text();
+            console.error('Server fout:', errorText);
+            alert('Fout bij opslaan: ' + errorText);
         }
+
+    } catch (e) {
+        console.error(e);
+        alert('Er ging iets mis met de verbinding.');
+    }
+}
     </script>
 </body>
 </html>
