@@ -17,8 +17,9 @@
 
     <div class="container">
         <div class="row">
+            
             <div class="col-md-4 mb-3">
-                <div class="card shadow-sm">
+                <div class="card shadow-sm sticky-top" style="top: 20px;">
                     <div class="card-header bg-dark text-white">Nieuwe Gebruiker</div>
                     <div class="card-body">
                         <form id="addUserForm">
@@ -45,64 +46,135 @@
 
             <div class="col-md-8">
                 <div class="card shadow-sm">
-                    <div class="card-header bg-white fw-bold">Gebruikersoverzicht</div>
+                    <div class="card-header bg-white p-0">
+                        <ul class="nav nav-tabs card-header-tabs m-0">
+                            <li class="nav-item">
+                                <a class="nav-link active" data-bs-toggle="tab" href="#usersTab">Gebruikers</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" data-bs-toggle="tab" href="#logsTab" onclick="loadLogs()">Logboek</a>
+                            </li>
+                        </ul>
+                    </div>
+                    
                     <div class="card-body p-0">
-                        <table class="table table-striped mb-0">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Naam</th>
-                                    <th>Rol</th>
-                                    <th>MFA</th>
-                                    <th>Actie</th>
-                                </tr>
-                            </thead>
-                            <tbody id="userTable">
-                                <tr><td colspan="5" class="text-center p-3">Laden...</td></tr>
-                            </tbody>
-                        </table>
+                        <div class="tab-content">
+                            
+                            <div class="tab-pane fade show active" id="usersTab">
+                                <table class="table table-striped mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Naam</th>
+                                            <th>Rol</th>
+                                            <th>MFA</th>
+                                            <th>Actie</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="userTable">
+                                        <tr><td colspan="5" class="text-center p-3">Laden...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="tab-pane fade" id="logsTab">
+                                <table class="table table-sm table-hover mb-0" style="font-size: 0.9em;">
+                                    <thead>
+                                        <tr>
+                                            <th>Tijd</th>
+                                            <th>Wie</th>
+                                            <th>Actie</th>
+                                            <th>Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="logTable">
+                                        <tr><td colspan="4" class="text-center p-3">Klik op tabblad om te laden...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Laad gebruikers bij start
+        // Start: Laad gebruikers meteen
         loadUsers();
 
+        // Functie: Gebruikers laden
         async function loadUsers() {
-            const res = await fetch('/api/admin-users');
-            if (!res.ok) {
-                if(res.status === 403) { 
-                    document.body.innerHTML = "<h1 class='text-center mt-5'>Geen toegang!</h1><p class='text-center'><a href='/'>Ga terug</a></p>";
+            try {
+                const res = await fetch('/api/admin-users');
+                if (!res.ok) {
+                    if(res.status === 403) { 
+                        document.body.innerHTML = "<div class='container mt-5 text-center'><h1>⛔ Geen toegang</h1><p>Je bent geen admin.</p><a href='/' class='btn btn-primary'>Terug</a></div>";
+                    }
+                    return;
                 }
-                return;
-            }
-            const users = await res.json();
-            
-            const tbody = document.getElementById('userTable');
-            tbody.innerHTML = '';
+                const users = await res.json();
+                
+                const tbody = document.getElementById('userTable');
+                tbody.innerHTML = '';
 
-            users.forEach(u => {
-                const row = `
-                    <tr>
-                        <td>${u.id}</td>
-                        <td>${u.username}</td>
-                        <td><span class="badge ${u.role === 'admin' ? 'bg-danger' : 'bg-primary'}">${u.role}</span></td>
-                        <td>${u.mfa_enabled ? '<i class="bi bi-check-circle-fill text-success"></i>' : '<span class="text-muted">-</span>'}</td>
-                        <td>
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteUser(${u.id})">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `;
-                tbody.innerHTML += row;
-            });
+                users.forEach(u => {
+                    const row = `
+                        <tr>
+                            <td>${u.id}</td>
+                            <td>${u.username}</td>
+                            <td><span class="badge ${u.role === 'admin' ? 'bg-danger' : 'bg-primary'}">${u.role}</span></td>
+                            <td>${u.mfa_enabled ? '<i class="bi bi-check-circle-fill text-success"></i>' : '<span class="text-muted">-</span>'}</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteUser(${u.id})">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                    tbody.innerHTML += row;
+                });
+            } catch(e) {
+                console.error(e);
+            }
         }
 
-        // Nieuwe gebruiker toevoegen
+        // Functie: Logs laden
+        async function loadLogs() {
+            const tbody = document.getElementById('logTable');
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center p-3">Laden...</td></tr>';
+
+            try {
+                const res = await fetch('/api/admin-logs');
+                if(!res.ok) return;
+                const logs = await res.json();
+                
+                tbody.innerHTML = '';
+                if(logs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center p-3">Nog geen logs gevonden.</td></tr>';
+                    return;
+                }
+
+                logs.forEach(log => {
+                    const date = new Date(log.created_at).toLocaleString('nl-NL');
+                    const row = `
+                        <tr>
+                            <td class="text-muted" style="white-space:nowrap;">${date}</td>
+                            <td class="fw-bold">${log.username}</td>
+                            <td><span class="badge bg-secondary">${log.action}</span></td>
+                            <td>${log.details}</td>
+                        </tr>
+                    `;
+                    tbody.innerHTML += row;
+                });
+            } catch(e) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-danger p-3">Fout bij laden logs.</td></tr>';
+            }
+        }
+
+        // Event: Nieuwe gebruiker toevoegen
         document.getElementById('addUserForm').onsubmit = async (e) => {
             e.preventDefault();
             const username = document.getElementById('newUser').value;
@@ -116,15 +188,17 @@
             });
 
             if(res.ok) {
-                alert('Gebruiker toegevoegd!');
+                alert('Gebruiker succesvol toegevoegd!');
                 document.getElementById('addUserForm').reset();
-                loadUsers();
+                loadUsers(); // Ververs de lijst
+                // Als we op de logs tab zitten, die ook verversen
+                if(document.querySelector('#logsTab').classList.contains('active')) loadLogs();
             } else {
                 alert('Fout: ' + await res.text());
             }
         };
 
-        // Verwijderen
+        // Functie: Verwijderen
         async function deleteUser(id) {
             if(!confirm('Weet je zeker dat je deze gebruiker wilt verwijderen?')) return;
             
@@ -134,8 +208,12 @@
                 body: JSON.stringify({ id })
             });
 
-            if(res.ok) loadUsers();
-            else alert(await res.text());
+            if(res.ok) {
+                loadUsers();
+                if(document.querySelector('#logsTab').classList.contains('active')) loadLogs();
+            } else {
+                alert(await res.text());
+            }
         }
     </script>
 </body>
