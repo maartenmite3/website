@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <title>Inloggen</title>
+    <style>body { font-family: sans-serif; display: flex; justify-content: center; margin-top: 100px; }</style>
+</head>
+<body>
+    <form id="loginForm" style="padding: 20px; border: 1px solid #ccc; border-radius: 8px;">
+        <h2>Login</h2>
+        <input type="text" id="user" placeholder="Gebruikersnaam" required><br><br>
+        <input type="password" id="pass" placeholder="Wachtwoord" required><br><br>
+        <button type="submit">Inloggen</button>
+        <p id="msg" style="color:red"></p>
+    </form>
+    <script>
+        document.getElementById('loginForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                body: JSON.stringify({
+                    username: document.getElementById('user').value,
+                    password: document.getElementById('pass').value
+                })
+            });
+            if (res.ok) window.location.href = '/'; // Ga naar index
+            else document.getElementById('msg').innerText = 'Foute gegevens!';
+        };
+    </script>
+</body>
+</html>
