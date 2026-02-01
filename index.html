@@ -19,6 +19,7 @@
             <div class="d-flex gap-3 align-items-center">
                 <a class="nav-link text-white" href="/assets.html" data-i18n="nav_assets">Assets</a>
                 <a class="nav-link text-white" href="/subscriptions.html" data-i18n="nav_subs">Subscripties</a>
+                <a class="nav-link text-white" href="/reports.html" data-i18n="nav_reports">Rapportages</a>
                 
                 <div class="dropdown">
                     <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
@@ -31,7 +32,7 @@
                 </div>
 
                 <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#settingsModal"><i class="bi bi-gear-fill"></i></button>
-                <a href="/api/logout" class="btn btn-danger btn-sm" data-i18n="btn_logout">Uit</a>
+                <a href="/login.html" class="btn btn-danger btn-sm" data-i18n="btn_logout">Uit</a>
             </div>
         </div>
     </nav>
@@ -124,7 +125,7 @@
         // --- VERTALINGEN ---
         const translations = {
             nl: {
-                nav_assets: "Assets", nav_subs: "Subscripties", btn_logout: "Uit",
+                nav_assets: "Assets", nav_subs: "Subscripties", nav_reports: "Rapportages", btn_logout: "Uit",
                 dash_title: "Security Dashboard", dash_welcome: "Welkom terug,",
                 kpi_total: "Totaal Assets", kpi_cis: "Gem. CIS Score", kpi_crit: "Kritieke Issues", kpi_high: "Hoge Issues",
                 chart_class: "Data Classificatie Verdeling", chart_vuln: "Kwetsbaarheden per Ernst",
@@ -133,7 +134,7 @@
                 mfa_active: "Actief", mfa_off: "Uit"
             },
             en: {
-                nav_assets: "Assets", nav_subs: "Subscriptions", btn_logout: "Logout",
+                nav_assets: "Assets", nav_subs: "Subscriptions", nav_reports: "Reports", btn_logout: "Logout",
                 dash_title: "Security Dashboard", dash_welcome: "Welcome back,",
                 kpi_total: "Total Assets", kpi_cis: "Avg CIS Score", kpi_crit: "Critical Issues", kpi_high: "High Issues",
                 chart_class: "Data Classification Distribution", chart_vuln: "Vulnerabilities by Severity",
@@ -163,6 +164,7 @@
         // --- INIT ---
         applyLanguage();
 
+        // Ophalen User & Dashboard Stats
         fetch('/api/user').then(r => {
             if(r.status===401) window.location.href='/login.html';
             return r.json();
