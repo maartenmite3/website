@@ -46,6 +46,10 @@
                 <button class="btn btn-primary" onclick="openCreateModal()"><i class="bi bi-plus-lg"></i> <span data-i18n="btn_new_asset">Nieuwe Asset</span></button>
                 <button class="btn btn-success ms-2" onclick="openImportModal()"><i class="bi bi-file-earmark-spreadsheet"></i> <span data-i18n="btn_import">Import</span></button>
                 <button class="btn btn-outline-dark ms-2" onclick="exportCSV()"><i class="bi bi-download"></i> <span data-i18n="btn_export">Export</span></button>
+                
+                <button id="btnBulk" class="btn btn-warning ms-2 d-none" onclick="openBulkModal()">
+                    <i class="bi bi-pencil-square"></i> <span data-i18n="btn_bulk_edit">Bulk Bewerken</span>
+                </button>
             </div>
             
             <div class="d-flex gap-2 align-items-center">
@@ -62,6 +66,7 @@
                 <table class="table table-hover mb-0 align-middle text-nowrap">
                     <thead class="table-light">
                         <tr>
+                            <th style="width: 40px;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
                             <th data-i18n="th_asset">Asset</th>
                             <th data-i18n="th_ips">IPs</th>
                             <th data-i18n="th_sub">Subscriptie</th>
@@ -73,7 +78,7 @@
                             <th class="text-end" data-i18n="th_action">Actie</th>
                         </tr>
                     </thead>
-                    <tbody id="assetTable"><tr><td colspan="9" class="p-4 text-center" data-i18n="loading">Laden...</td></tr></tbody>
+                    <tbody id="assetTable"><tr><td colspan="10" class="p-4 text-center" data-i18n="loading">Laden...</td></tr></tbody>
                 </table>
             </div>
         </div>
@@ -125,6 +130,41 @@
         </div>
     </div>
 
+    <div class="modal fade" id="bulkModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title" data-i18n="modal_bulk">Bulk Bewerken</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="bulkCountMsg">Je staat op het punt om X items te bewerken.</p>
+                    
+                    <div class="mb-3">
+                        <label class="form-label" data-i18n="lbl_field">Kies een veld</label>
+                        <select id="bulkField" class="form-select" onchange="updateBulkInput()">
+                            <option value="owner_contact" data-i18n="lbl_owner">Eigenaar</option>
+                            <option value="subscription_id" data-i18n="lbl_sub">Subscriptie</option>
+                            <option value="classification" data-i18n="lbl_class">Classificatie</option>
+                            <option value="type">Type</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" data-i18n="lbl_value">Nieuwe Waarde</label>
+                        <div id="bulkValueContainer">
+                            <input type="text" id="bulkValue" class="form-control">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="btn_cancel">Annuleren</button>
+                    <button type="button" class="btn btn-warning" onclick="executeBulkUpdate()" data-i18n="btn_update">Updaten</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="detailModal" tabindex="-1">
         <div class="modal-dialog modal-xl">
             <div class="modal-content">
@@ -138,23 +178,25 @@
                     </ul>
                     <div class="tab-content p-3">
                         <div class="tab-pane fade show active" id="tabVuln">
-                            <form id="vulnForm" class="row g-2 mb-3 bg-light p-2 border rounded">
+                            <table class="table table-sm table-striped"><thead><tr><th data-i18n="th_name">Naam</th><th>Severity</th><th>Status</th><th data-i18n="th_date">Datum</th><th></th></tr></thead><tbody id="vulnTable"></tbody></table>
+                            <div class="text-end mt-2"><button class="btn btn-sm btn-outline-success" onclick="toggleForm('vulnForm')">+</button></div>
+                            <form id="vulnForm" class="row g-2 mt-2 p-2 border rounded d-none">
                                 <div class="col-md-3"><input type="text" id="vName" class="form-control form-control-sm" placeholder="Naam"></div>
                                 <div class="col-md-2"><select id="vSev" class="form-select form-select-sm"><option>Critical</option><option>High</option><option>Medium</option></select></div>
                                 <div class="col-md-3"><select id="vStat" class="form-select form-select-sm"><option>Open</option><option>Tijdelijke Uitzondering</option></select></div>
                                 <div class="col-md-2"><input type="date" id="vDate" class="form-control form-control-sm"></div>
                                 <div class="col-md-2"><button type="button" onclick="addVuln()" class="btn btn-sm btn-success w-100" data-i18n="btn_add">Toevoegen</button></div>
                             </form>
-                            <table class="table table-sm table-striped"><thead><tr><th data-i18n="th_name">Naam</th><th>Severity</th><th>Status</th><th data-i18n="th_date">Datum</th><th></th></tr></thead><tbody id="vulnTable"></tbody></table>
                         </div>
                         <div class="tab-pane fade" id="tabCis">
-                            <form id="cisForm" class="row g-2 mb-3 bg-light p-2 border rounded">
+                            <table class="table table-sm table-striped"><thead><tr><th>ID</th><th data-i18n="th_desc">Beschrijving</th><th data-i18n="th_reason">Reden</th><th></th></tr></thead><tbody id="cisTable"></tbody></table>
+                            <div class="text-end mt-2"><button class="btn btn-sm btn-outline-success" onclick="toggleForm('cisForm')">+</button></div>
+                            <form id="cisForm" class="row g-2 mt-2 p-2 border rounded d-none">
                                 <div class="col-md-2"><input type="text" id="cId" class="form-control form-control-sm" placeholder="ID"></div>
                                 <div class="col-md-5"><input type="text" id="cDesc" class="form-control form-control-sm" placeholder="Beschrijving"></div>
                                 <div class="col-md-3"><input type="text" id="cJust" class="form-control form-control-sm" placeholder="Reden"></div>
                                 <div class="col-md-2"><button type="button" onclick="addCis()" class="btn btn-sm btn-success w-100" data-i18n="btn_add">Toevoegen</button></div>
                             </form>
-                            <table class="table table-sm table-striped"><thead><tr><th>ID</th><th data-i18n="th_desc">Beschrijving</th><th data-i18n="th_reason">Reden</th><th></th></tr></thead><tbody id="cisTable"></tbody></table>
                         </div>
                         <div class="tab-pane fade" id="tabRel">
                             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -163,19 +205,12 @@
                             </div>
                             <form id="relForm" class="row g-2 mb-3 bg-light p-2 border rounded align-items-center">
                                 <div class="col-auto" data-i18n="lbl_this_asset">Deze asset...</div>
-                                <div class="col-md-3">
-                                    <select id="rType" class="form-select form-select-sm">
-                                        <option value="Draait op" data-i18n-val="Draait op">Draait op</option>
-                                        <option value="Verbonden met" data-i18n-val="Verbonden met">Verbonden met</option>
-                                        <option value="Afhankelijk van" data-i18n-val="Afhankelijk van">Afhankelijk van</option>
-                                        <option value="Is onderdeel van" data-i18n-val="Is onderdeel van">Is onderdeel van</option>
-                                    </select>
-                                </div>
+                                <div class="col-md-3"><select id="rType" class="form-select form-select-sm"><option value="Draait op" data-i18n-val="Draait op">Draait op</option><option value="Verbonden met" data-i18n-val="Verbonden met">Verbonden met</option><option value="Afhankelijk van" data-i18n-val="Afhankelijk van">Afhankelijk van</option></select></div>
                                 <div class="col-md-4"><select id="rTarget" class="form-select form-select-sm"><option>Laden...</option></select></div>
                                 <div class="col-md-2"><button type="button" onclick="addRel()" class="btn btn-sm btn-success w-100" data-i18n="btn_link">Koppelen</button></div>
                             </form>
-                            <h6 data-i18n="hdr_downstream">Afhankelijkheden (Downstream)</h6><table class="table table-sm table-bordered mb-3"><tbody id="relDownTable"></tbody></table>
-                            <h6 data-i18n="hdr_upstream">Wordt gebruikt door (Upstream)</h6><table class="table table-sm table-bordered"><tbody id="relUpTable"></tbody></table>
+                            <h6 data-i18n="hdr_downstream">Afhankelijkheden</h6><table class="table table-sm table-bordered mb-3"><tbody id="relDownTable"></tbody></table>
+                            <h6 data-i18n="hdr_upstream">Gebruikt door</h6><table class="table table-sm table-bordered"><tbody id="relUpTable"></tbody></table>
                         </div>
                         <div class="tab-pane fade" id="tabHist"><table class="table table-sm text-muted small"><thead><tr><th data-i18n="th_time">Tijd</th><th data-i18n="th_who">Wie</th><th>Type</th></tr></thead><tbody id="histTable"></tbody></table></div>
                     </div>
@@ -228,43 +263,38 @@
         // --- TRANSLATIONS & DATA MAPPING ---
         const translations = {
             nl: {
-                btn_manage_subs: "Beheer Subscripties", btn_dashboard: "Dashboard", btn_new_asset: "Nieuwe Asset", btn_import: "Import", btn_export: "Export", opt_all: "Alles",
+                btn_manage_subs: "Beheer Subscripties", btn_dashboard: "Dashboard", btn_new_asset: "Nieuwe Asset", btn_import: "Import", btn_export: "Export", opt_all: "Alles", btn_bulk_edit: "Bulk Bewerken",
                 th_asset: "Asset", th_ips: "IPs", th_sub: "Subscriptie", th_owner: "Eigenaar", th_labels: "Labels", th_vulns: "Vulns", th_class: "Class", th_action: "Actie", loading: "Laden...",
                 lbl_name: "Naam", lbl_sub: "Subscriptie", lbl_owner: "Eigenaar", lbl_ips: "IP Adres(sen)", lbl_class: "Classificatie", lbl_sens: "Data Gevoeligheid",
-                btn_cancel: "Annuleren", btn_save: "Opslaan", btn_add: "Toevoegen", btn_link: "Koppelen", btn_show_network: "Toon Netwerk",
+                btn_cancel: "Annuleren", btn_save: "Opslaan", btn_update: "Updaten", btn_add: "Toevoegen", btn_link: "Koppelen", btn_show_network: "Toon Netwerk",
                 tab_vuln: "🛑 Kwetsbaarheden", tab_cis: "✅ CIS", tab_rel: "🔗 Relaties", tab_hist: "🕒 Geschiedenis",
                 th_name: "Naam", th_date: "Datum", th_desc: "Beschrijving", th_reason: "Reden", th_time: "Tijd", th_who: "Wie",
-                hdr_downstream: "Afhankelijkheden (Downstream)", hdr_upstream: "Wordt gebruikt door (Upstream)", rel_info: "Koppel assets om afhankelijkheden in kaart te brengen.", lbl_this_asset: "Deze asset...",
-                modal_network: "Netwerk Overzicht", modal_import: "Importeren", btn_analyze: "Analyseren", tab_new: "Nieuw", btn_start_import: "Start Import",
+                hdr_downstream: "Afhankelijkheden", hdr_upstream: "Gebruikt door", rel_info: "Koppel assets om afhankelijkheden in kaart te brengen.", lbl_this_asset: "Deze asset...",
+                modal_network: "Netwerk Overzicht", modal_import: "Importeren", modal_bulk: "Bulk Bewerken", btn_analyze: "Analyseren", tab_new: "Nieuw", btn_start_import: "Start Import",
                 txt_prev: "Vorige", txt_next: "Volgende", txt_no_data: "Geen data", alert_saved: "Opgeslagen", alert_deleted: "Verwijderd", alert_confirm: "Zeker weten?",
                 btn_organize: "Organiseren", btn_stop_organize: "Stop Organiseren", btn_save_layout: "Layout Opslaan", btn_photo: "Foto",
-                lbl_cross_sub: "Cross-Subscription Gedetecteerd!", lbl_current_asset: "Huidige Asset", lbl_downstream: "Afhankelijkheden", lbl_upstream: "Gebruikt door"
+                lbl_cross_sub: "Cross-Subscription Gedetecteerd!", lbl_current_asset: "Huidige Asset", lbl_downstream: "Downstream", lbl_upstream: "Upstream",
+                lbl_field: "Kies Veld", lbl_value: "Nieuwe Waarde", txt_bulk_msg: "Je bewerkt {n} items."
             },
             en: {
-                btn_manage_subs: "Manage Subscriptions", btn_dashboard: "Dashboard", btn_new_asset: "New Asset", btn_import: "Import", btn_export: "Export", opt_all: "All",
+                btn_manage_subs: "Manage Subscriptions", btn_dashboard: "Dashboard", btn_new_asset: "New Asset", btn_import: "Import", btn_export: "Export", opt_all: "All", btn_bulk_edit: "Bulk Edit",
                 th_asset: "Asset", th_ips: "IPs", th_sub: "Subscription", th_owner: "Owner", th_labels: "Labels", th_vulns: "Vulns", th_class: "Class", th_action: "Action", loading: "Loading...",
                 lbl_name: "Name", lbl_sub: "Subscription", lbl_owner: "Owner", lbl_ips: "IP Address(es)", lbl_class: "Classification", lbl_sens: "Data Sensitivity",
-                btn_cancel: "Cancel", btn_save: "Save", btn_add: "Add", btn_link: "Link", btn_show_network: "Show Network",
+                btn_cancel: "Cancel", btn_save: "Save", btn_update: "Update", btn_add: "Add", btn_link: "Link", btn_show_network: "Show Network",
                 tab_vuln: "🛑 Vulnerabilities", tab_cis: "✅ CIS", tab_rel: "🔗 Relations", tab_hist: "🕒 History",
                 th_name: "Name", th_date: "Date", th_desc: "Description", th_reason: "Reason", th_time: "Time", th_who: "Who",
-                hdr_downstream: "Dependencies (Downstream)", hdr_upstream: "Used by (Upstream)", rel_info: "Link assets to map dependencies.", lbl_this_asset: "This asset...",
-                modal_network: "Network Overview", modal_import: "Import", btn_analyze: "Analyze", tab_new: "New", btn_start_import: "Start Import",
+                hdr_downstream: "Dependencies", hdr_upstream: "Used by", rel_info: "Link assets to map dependencies.", lbl_this_asset: "This asset...",
+                modal_network: "Network Overview", modal_import: "Import", modal_bulk: "Bulk Edit", btn_analyze: "Analyze", tab_new: "New", btn_start_import: "Start Import",
                 txt_prev: "Previous", txt_next: "Next", txt_no_data: "No data", alert_saved: "Saved", alert_deleted: "Deleted", alert_confirm: "Are you sure?",
                 btn_organize: "Organize", btn_stop_organize: "Stop Organizing", btn_save_layout: "Save Layout", btn_photo: "Photo",
-                lbl_cross_sub: "Cross-Subscription Detected!", lbl_current_asset: "Current Asset", lbl_downstream: "Dependencies", lbl_upstream: "Used by"
+                lbl_cross_sub: "Cross-Subscription Detected!", lbl_current_asset: "Current Asset", lbl_downstream: "Downstream", lbl_upstream: "Upstream",
+                lbl_field: "Choose Field", lbl_value: "New Value", txt_bulk_msg: "You are editing {n} items."
             }
         };
 
-        // --- DATABASE WAARDEN VERTALING ---
         const dataTranslations = {
-            nl: {
-                "Draait op": "Draait op", "Verbonden met": "Verbonden met", "Afhankelijk van": "Afhankelijk van", "Is onderdeel van": "Is onderdeel van",
-                "Virtual Machine": "Virtual Machine", "Network Interface": "Netwerk Interface", "SQL Database": "SQL Database", "Key Vault": "Key Vault", "Storage Account": "Storage Account", "Recovery Services Vault": "Recovery Services Vault", "Private Endpoint": "Private Endpoint", "App Service": "App Service", "Firewall": "Firewall"
-            },
-            en: {
-                "Draait op": "Runs on", "Verbonden met": "Connected to", "Afhankelijk van": "Depends on", "Is onderdeel van": "Is part of",
-                "Virtual Machine": "Virtual Machine", "Network Interface": "Network Interface", "SQL Database": "SQL Database", "Key Vault": "Key Vault", "Storage Account": "Storage Account", "Recovery Services Vault": "Recovery Services Vault", "Private Endpoint": "Private Endpoint", "App Service": "App Service", "Firewall": "Firewall"
-            }
+            nl: { "Draait op":"Draait op", "Verbonden met":"Verbonden met", "Afhankelijk van":"Afhankelijk van", "Virtual Machine":"Virtual Machine", "Network Interface":"Netwerk Interface", "SQL Database":"SQL Database", "Key Vault":"Key Vault", "Private Endpoint":"Private Endpoint" },
+            en: { "Draait op":"Runs on", "Verbonden met":"Connected to", "Afhankelijk van":"Depends on", "Virtual Machine":"Virtual Machine", "Network Interface":"Network Interface", "SQL Database":"SQL Database", "Key Vault":"Key Vault", "Private Endpoint":"Private Endpoint" }
         };
 
         // --- I18N LOGIC ---
@@ -272,35 +302,23 @@
         function applyLanguage() {
             const lang = localStorage.getItem('lang') || 'nl';
             document.getElementById('currentLang').innerText = lang.toUpperCase();
-            
-            // 1. UI Teksten
             document.querySelectorAll('[data-i18n]').forEach(el => {
                 const key = el.getAttribute('data-i18n');
                 if(translations[lang][key]) el.innerText = translations[lang][key];
             });
-
-            // 2. Dropdown Opties (Behoud Value, verander tekst)
             document.querySelectorAll('option[data-i18n-val]').forEach(opt => {
                 const key = opt.getAttribute('data-i18n-val');
                 opt.innerText = dataTranslations[lang][key] || key;
             });
-
-            // Herlaad data weergave
-            if(allAssets.length > 0) { renderTable(allAssets); renderPagination(); }
+            if(allAssets.length > 0) { renderTable(allAssets); renderPagination(); updateBulkMsg(); }
         }
         function t(key) { const lang = localStorage.getItem('lang') || 'nl'; return translations[lang][key] || key; }
-        
-        // Vertaal Data uit DB (e.g. "Draait op" -> "Runs on")
-        function tr(value) {
-            const lang = localStorage.getItem('lang') || 'nl';
-            return dataTranslations[lang][value] || value;
-        }
+        function tr(value) { const lang = localStorage.getItem('lang') || 'nl'; return dataTranslations[lang][value] || value; }
 
         // --- GLOBAL VARS ---
-        let allAssets = []; let allSubs = []; let currentAssetId = null; 
-        let currentRelationships = null; let currentLayout = null;
+        let allAssets = []; let allSubs = []; let currentAssetId = null; let currentRelationships = null; let currentLayout = null;
         let isGlobalRevealed = false; let importData = { new: [] }; let searchTimeout = null; let networkInstance = null;
-        let currentPage = 1; let totalPages = 1;
+        let currentPage = 1; let totalPages = 1; let selectedIds = new Set();
 
         // INIT
         applyLanguage();
@@ -332,18 +350,21 @@
             const query = document.getElementById('searchBar').value;
             currentPage = page;
             let url = `/api/assets?limit=${limit}&page=${page}`; if(query) url += `&q=${encodeURIComponent(query)}`;
+            
             const tbody = document.getElementById('assetTable');
-            tbody.innerHTML = `<tr><td colspan="9" class="p-4 text-center">${t('loading')}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="10" class="p-4 text-center">${t('loading')}</td></tr>`;
+            
             const res = await fetch(url);
             if(res.status === 401) return window.location.href='/login.html';
             const response = await res.json();
             allAssets = response.data; totalPages = response.meta.pages || 1;
+            selectedIds.clear(); updateBulkUI();
             renderTable(allAssets); renderPagination();
         }
 
         function renderTable(data) {
             const tbody = document.getElementById('assetTable'); tbody.innerHTML = '';
-            if(data.length===0) return tbody.innerHTML = `<tr><td colspan="9" class="p-4 text-center">${t('txt_no_data')}</td></tr>`;
+            if(data.length===0) return tbody.innerHTML = `<tr><td colspan="10" class="p-4 text-center">${t('txt_no_data')}</td></tr>`;
             data.forEach(a => {
                 let rCls = a.classification==='Confidential'?'confidential':(a.classification==='Internal'?'internal':'public');
                 let vBadge = a.vuln_count>0?`<span class="badge bg-danger">${a.vuln_count}</span>`:`<span class="badge bg-success">0</span>`;
@@ -357,6 +378,7 @@
 
                 tbody.innerHTML += `
                     <tr class="${rCls}">
+                        <td><input type="checkbox" class="row-select" value="${a.id}" onclick="toggleRow(${a.id})"></td>
                         <td>
                             <div class="d-flex align-items-center">
                                 <img src="${imgUrl}" class="asset-icon-img" alt="icon">
@@ -375,6 +397,73 @@
             });
         }
 
+        // --- BULK SELECTION ---
+        function toggleSelectAll() {
+            const checked = document.getElementById('selectAll').checked;
+            document.querySelectorAll('.row-select').forEach(cb => { cb.checked = checked; toggleRow(parseInt(cb.value), false); });
+            updateBulkUI();
+        }
+        function toggleRow(id, autoUpdate = true) {
+            if(selectedIds.has(id) && !document.querySelector(`.row-select[value="${id}"]`).checked) selectedIds.delete(id);
+            else if(document.querySelector(`.row-select[value="${id}"]`).checked) selectedIds.add(id);
+            if(autoUpdate) updateBulkUI();
+        }
+        function updateBulkUI() {
+            const btn = document.getElementById('btnBulk');
+            if(selectedIds.size > 0) btn.classList.remove('d-none'); else btn.classList.add('d-none');
+        }
+        function openBulkModal() {
+            updateBulkMsg();
+            updateBulkInput(); // Initialiseer input
+            new bootstrap.Modal(document.getElementById('bulkModal')).show();
+        }
+        function updateBulkMsg() { document.getElementById('bulkCountMsg').innerText = t('txt_bulk_msg').replace('{n}', selectedIds.size); }
+        
+        function updateBulkInput() {
+            const field = document.getElementById('bulkField').value;
+            const container = document.getElementById('bulkValueContainer');
+            container.innerHTML = ''; // Clear
+
+            if(field === 'subscription_id') {
+                const sel = document.createElement('select'); sel.className = 'form-select'; sel.id = 'bulkValue';
+                allSubs.forEach(s => { const opt = document.createElement('option'); opt.value = s.guid; opt.innerText = s.name; sel.appendChild(opt); });
+                container.appendChild(sel);
+            } else if (field === 'classification') {
+                const sel = document.createElement('select'); sel.className = 'form-select'; sel.id = 'bulkValue';
+                ['Public', 'Internal', 'Confidential'].forEach(c => { const opt = document.createElement('option'); opt.value = c; opt.innerText = c; sel.appendChild(opt); });
+                container.appendChild(sel);
+            } else if (field === 'type') {
+                const sel = document.createElement('select'); sel.className = 'form-select'; sel.id = 'bulkValue';
+                const types = ["Virtual Machine", "SQL Database", "App Service", "Firewall", "Network Interface", "Key Vault", "Storage Account", "Recovery Services Vault", "Private Endpoint"];
+                types.forEach(t => { const opt = document.createElement('option'); opt.value = t; opt.innerText = tr(t); sel.appendChild(opt); });
+                container.appendChild(sel);
+            } else {
+                const inp = document.createElement('input'); inp.type = 'text'; inp.className = 'form-control'; inp.id = 'bulkValue';
+                container.appendChild(inp);
+            }
+        }
+
+        async function executeBulkUpdate() {
+            const field = document.getElementById('bulkField').value;
+            const value = document.getElementById('bulkValue').value;
+            const ids = Array.from(selectedIds);
+            
+            const res = await fetch('/api/assets', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ mode: 'bulk', ids: ids, field: field, value: value })
+            });
+            
+            if(res.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('bulkModal')).hide();
+                loadAssets(currentPage);
+                alert(t('alert_saved'));
+            } else {
+                alert("Error: " + await res.text());
+            }
+        }
+
+        // --- PAGINATION & SEARCH ---
         function renderPagination() {
             const nav = document.getElementById('paginationControls'); nav.innerHTML = '';
             if(totalPages <= 1) return;
@@ -426,7 +515,6 @@
                 if(!nodes.find(n => n.id === r.linked_asset_id)) {
                     nodes.push({ id: r.linked_asset_id, label: r.name, shape: 'image', image: img, shapeProperties: { useBorderWithImage: true }, borderWidth: borderWidth, color: { border: borderColor, background: '#fff' }, x: nodePos.x, y: nodePos.y });
                 }
-                // HIER: Vertaal de relatie text (r.relation_type)
                 edges.push({ from: currentAssetId, to: r.linked_asset_id, label: tr(r.relation_type), arrows: 'to', color: { color: edgeColor }, dashes: dashes, width: isCrossSub ? 2 : 1 });
             };
             currentRelationships.downstream.forEach(r => addLinkedNode(r, '#ffc107'));
@@ -465,13 +553,13 @@
                 const hT = document.getElementById('histTable'); hT.innerHTML=''; data.history.forEach(h => hT.innerHTML+=`<tr><td>${new Date(h.timestamp).toLocaleString()}</td><td>${h.changed_by}</td><td>${h.change_type}</td></tr>`);
                 await loadAssetDropdown();
                 const rdT = document.getElementById('relDownTable'); rdT.innerHTML = ''; 
-                // HIER OOK VERTALING TOEPASSEN (tr)
                 data.relationships.downstream.forEach(r => rdT.innerHTML += `<tr><td>${tr(r.relation_type)} <span class="fw-bold">${r.name}</span></td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
                 const ruT = document.getElementById('relUpTable'); ruT.innerHTML = ''; 
                 data.relationships.upstream.forEach(r => ruT.innerHTML += `<tr><td><span class="fw-bold">${r.name}</span> ${tr(r.relation_type)} deze asset</td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
                 new bootstrap.Modal(document.getElementById('detailModal')).show();
             } catch(e) { console.error(e); alert("Details fout"); }
         }
+        function toggleForm(id) { document.getElementById(id).classList.toggle('d-none'); }
         async function loadAssetDropdown() { const res = await fetch('/api/asset-details?type=list'); const list = await res.json(); const sel = document.getElementById('rTarget'); sel.innerHTML = '<option value="">...</option>'; list.forEach(item => { if(item.id !== currentAssetId) sel.innerHTML += `<option value="${item.id}">${item.name}</option>`; }); }
         async function addRel() { const targetId = document.getElementById('rTarget').value; const type = document.getElementById('rType').value; if(!targetId) return alert("Kies een asset"); await fetch('/api/asset-details', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ type: 'rel', parent_id: currentAssetId, child_id: targetId, relation_type: type }) }); const name = document.getElementById('detailTitle').innerText.replace('Details voor: ', ''); openDetailModal(currentAssetId, name); }
         async function deleteDetail(type, id) { if(!confirm(t('alert_confirm'))) return; await fetch('/api/asset-details', { method: 'DELETE', body: JSON.stringify({type, id}) }); const name = document.getElementById('detailTitle').innerText.replace('Details voor: ', ''); openDetailModal(currentAssetId, name); if(type !== 'rel') loadAssets(currentPage); }
@@ -484,6 +572,7 @@
         function openImportModal() { document.getElementById('importPreview').classList.add('d-none'); document.getElementById('csvFile').value=''; new bootstrap.Modal(document.getElementById('importModal')).show(); }
         function analyzeCSV() { const file = document.getElementById('csvFile').files[0]; if(!file) return alert('Kies bestand'); const reader = new FileReader(); reader.onload=async(e)=>{ const rows=csvToJSON(e.target.result); if(!rows.length) return alert(t('txt_no_data')); const r=await fetch('/api/import-handler', {method:'POST', body:JSON.stringify({mode:'check', type:'assets', data:rows})}); const d=await r.json(); importData.new=d.new; document.getElementById('countNew').innerText=d.new.length; document.getElementById('listNew').innerHTML=d.new.map(i=>`<tr><td>${i.name}</td></tr>`).join(''); document.getElementById('importPreview').classList.remove('d-none'); document.getElementById('btnConfirmImport').disabled=!d.new.length; }; reader.readAsText(file); }
         async function executeImport() { if(!confirm(t('alert_confirm'))) return; const r=await fetch('/api/import-handler', {method:'POST', body:JSON.stringify({mode:'execute', type:'assets', data:importData.new})}); if(r.ok) { alert('Klaar'); bootstrap.Modal.getInstance(document.getElementById('importModal')).hide(); loadAssets(currentPage); } }
+        async function exportCSV() { const res = await fetch('/api/assets?limit=all'); if(!res.ok) return alert('Fout'); const json = await res.json(); const data = json.data; if(!data.length) return alert(t('txt_no_data')); const headers = ["ID", "Naam", "Type", "IP Adressen", "Subscriptie", "Eigenaar", "CIS Score", "Classificatie", "Gevoeligheid", "Vuln Count"]; let csv = headers.join(",") + "\n"; data.forEach(a => { const subObj = allSubs.find(s => s.guid === a.subscription_id); const subName = subObj ? subObj.name : a.subscription_id; const ips = (a.ips && a.ips.length > 0) ? a.ips.join(";") : a.ip_address; const row = [a.id, `"${a.name}"`, `"${a.type}"`, `"${ips}"`, `"${subName}"`, `"${a.owner_contact}"`, a.cis_score||0, a.classification, `"${(a.data_sensitivity||'').replace(/,/g,';')}"`, a.vuln_count]; csv += row.join(",") + "\n"; }); const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `assets_export_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(link); link.click(); document.body.removeChild(link); }
         function csvToJSON(csv) { const lines=csv.split(/\r?\n/); if(lines.length<1) return []; const h=lines[0].split(',').map(x=>x.trim().replace(/^"|"$/g,'').replace(/^\uFEFF/,'')); const res=[]; for(let i=1;i<lines.length;i++){ if(!lines[i].trim()) continue; const l=lines[i].split(','); const o={}; for(let j=0;j<h.length;j++) o[h[j]]=l[j]?l[j].trim().replace(/^"|"$/g,''):''; res.push(o); } return res; }
     </script>
 </body>
