@@ -10,6 +10,7 @@
         .cursor-pointer { cursor: pointer; }
         .card-select:hover { border-color: #0d6efd; background-color: #f8f9fa; }
         .card-select.active { border-color: #0d6efd; background-color: #e7f1ff; }
+        .pagination { margin-top: 1rem; margin-bottom: 0; }
     </style>
 </head>
 <body class="bg-light">
@@ -39,7 +40,7 @@
                     <div class="card-body text-center">
                         <h2 class="text-warning display-5 fw-bold" id="countIncomplete">-</h2>
                         <h6 class="text-muted" data-i18n="kpi_incomplete">Missende Data</h6>
-                        <small class="text-muted" data-i18n="desc_incomplete">Geen eigenaar of subscriptie</small>
+                        <small class="text-muted" data-i18n="desc_incomplete">Geen eigenaar/sub</small>
                     </div>
                 </div>
             </div>
@@ -72,12 +73,13 @@
             </div>
         </div>
 
-        <div class="card shadow-sm">
-            <div class="card-header bg-white">
-                <h5 id="tableTitle">Details</h5>
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 id="tableTitle" class="mb-0">Details</h5>
+                <span class="badge bg-secondary" id="pageIndicator"></span>
             </div>
             <div class="card-body p-0">
-                <table class="table table-hover mb-0">
+                <table class="table table-hover mb-0 align-middle">
                     <thead class="table-light">
                         <tr>
                             <th data-i18n="th_asset">Asset</th>
@@ -90,6 +92,12 @@
                         <tr><td colspan="4" class="p-4 text-center" data-i18n="loading">Laden...</td></tr>
                     </tbody>
                 </table>
+            </div>
+            <div class="card-footer bg-white border-top-0 d-flex justify-content-center py-3">
+                <nav aria-label="Pagination">
+                    <ul class="pagination" id="qualityPagination">
+                        </ul>
+                </nav>
             </div>
         </div>
     </div>
@@ -105,7 +113,8 @@
                 kpi_stale: "Zombies", desc_stale: "> 6 mnd niet gezien",
                 kpi_dupes: "Dubbele IP's", desc_dupes: "Conflicterende adressen",
                 th_asset: "Asset", th_issue: "Probleem", th_action: "Actie", loading: "Laden...",
-                btn_edit: "Bewerk", txt_missing: "Mist: ", txt_last_seen: "Laatst gezien: ", txt_dupe_count: "Aantal keer gevonden: "
+                btn_edit: "Bewerk", txt_missing: "Mist: ", txt_last_seen: "Laatst gezien: ", txt_dupe_count: "Aantal keer gevonden: ",
+                txt_clean: "Alles schoon!", txt_prev: "Vorige", txt_next: "Volgende"
             },
             en: {
                 btn_back: "Back to Assets", title_quality: "Data Quality",
@@ -114,7 +123,8 @@
                 kpi_stale: "Zombies", desc_stale: "> 6 months inactive",
                 kpi_dupes: "Duplicate IPs", desc_dupes: "Conflicting addresses",
                 th_asset: "Asset", th_issue: "Issue", th_action: "Action", loading: "Loading...",
-                btn_edit: "Edit", txt_missing: "Missing: ", txt_last_seen: "Last seen: ", txt_dupe_count: "Found count: "
+                btn_edit: "Edit", txt_missing: "Missing: ", txt_last_seen: "Last seen: ", txt_dupe_count: "Found count: ",
+                txt_clean: "All clean!", txt_prev: "Previous", txt_next: "Next"
             }
         };
 
@@ -129,9 +139,13 @@
         }
         function t(key) { const lang = localStorage.getItem('lang') || 'nl'; return translations[lang][key] || key; }
 
-        // --- GLOBAL DATA ---
+        // --- GLOBAL DATA & PAGINATION VARS ---
         let qualityData = {};
         let currentTab = 'incomplete';
+        
+        // Paginering Instellingen
+        let currentPage = 1;
+        const itemsPerPage = 25;
 
         applyLanguage();
         loadData();
@@ -154,9 +168,12 @@
 
         function showTab(tab) {
             currentTab = tab;
+            currentPage = 1; // Reset pagina naar 1 bij wisselen tab
+            
             // Update UI active state
             document.querySelectorAll('.card-select').forEach(c => c.classList.remove('active'));
             document.getElementById('card-' + tab).classList.add('active');
+            
             renderTable();
         }
 
@@ -164,23 +181,40 @@
             const tbody = document.getElementById('detailTable');
             tbody.innerHTML = '';
             
-            let data = [];
-            if(currentTab === 'incomplete') data = qualityData.incomplete;
-            if(currentTab === 'orphans') data = qualityData.orphans;
-            if(currentTab === 'stale') data = qualityData.stale;
-            if(currentTab === 'duplicates') data = qualityData.duplicates;
+            // Bepaal welke dataset we gebruiken
+            let fullData = [];
+            if(currentTab === 'incomplete') fullData = qualityData.incomplete || [];
+            if(currentTab === 'orphans') fullData = qualityData.orphans || [];
+            if(currentTab === 'stale') fullData = qualityData.stale || [];
+            if(currentTab === 'duplicates') fullData = qualityData.duplicates || [];
 
-            if(data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-success"><i class="bi bi-check-circle display-4"></i><br>Alles schoon!</td></tr>`;
+            if(fullData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-success"><i class="bi bi-check-circle display-4"></i><br>${t('txt_clean')}</td></tr>`;
+                document.getElementById('qualityPagination').innerHTML = ''; // Geen paginering nodig
+                document.getElementById('pageIndicator').innerText = '';
                 return;
             }
 
-            data.forEach(item => {
+            // PAGINERING LOGICA
+            const totalItems = fullData.length;
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            
+            // Zorg dat currentPage geldig blijft
+            if (currentPage > totalPages) currentPage = totalPages;
+            if (currentPage < 1) currentPage = 1;
+
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const pageData = fullData.slice(startIndex, endIndex);
+
+            // Update Page Indicator (bovenin tabel)
+            document.getElementById('pageIndicator').innerText = `${startIndex + 1}-${Math.min(endIndex, totalItems)} / ${totalItems}`;
+
+            // Render Rijen
+            pageData.forEach(item => {
                 let issueText = '';
                 
-                // Bepaal tekst op basis van tab
                 if(currentTab === 'incomplete') {
-                    // Vertaal de missende velden
                     const missing = item.missing.map(m => {
                         if(m==='owner') return 'Eigenaar';
                         if(m==='subscription') return 'Subscriptie';
@@ -188,24 +222,15 @@
                     }).join(', ');
                     issueText = `<span class="badge bg-warning text-dark">${t('txt_missing')} ${missing}</span>`;
                 }
-                else if(currentTab === 'orphans') {
-                    issueText = `<span class="text-muted">Geen relaties in netwerk diagram</span>`;
-                }
+                else if(currentTab === 'orphans') issueText = `<span class="text-muted">Geen relaties in netwerk diagram</span>`;
                 else if(currentTab === 'stale') {
                     const date = new Date(item.last_seen || 0).toLocaleDateString();
                     issueText = `<span class="text-danger">${t('txt_last_seen')} ${date}</span>`;
                 }
-                else if(currentTab === 'duplicates') {
-                    // Duplicates is een speciale structuur {hash, count}
-                    // Voor nu kunnen we niet direct naar asset ID linken omdat het een groep is.
-                    // We tonen gewoon dat er een conflict is.
-                    issueText = `${t('txt_dupe_count')} ${item.count}`;
-                }
+                else if(currentTab === 'duplicates') issueText = `${t('txt_dupe_count')} ${item.count}`;
 
-                // Voor duplicates hebben we geen asset ID direct beschikbaar in deze view (zou complexere query vereisen)
-                // Dus we disablen de edit knop voor duplicates in deze simpele versie
                 const btnDisabled = currentTab === 'duplicates' ? 'disabled' : '';
-                const assetName = item.name || 'Onbekend IP Conflict';
+                const assetName = item.name || 'Onbekend';
                 const assetType = item.type || '-';
 
                 tbody.innerHTML += `
@@ -221,6 +246,38 @@
                     </tr>
                 `;
             });
+
+            renderPaginationControls(totalPages);
+        }
+
+        function renderPaginationControls(totalPages) {
+            const nav = document.getElementById('qualityPagination');
+            nav.innerHTML = '';
+
+            if (totalPages <= 1) return;
+
+            // Vorige
+            const prevDisabled = currentPage === 1 ? 'disabled' : '';
+            nav.innerHTML += `<li class="page-item ${prevDisabled}"><button class="page-link" onclick="changePage(${currentPage - 1})">${t('txt_prev')}</button></li>`;
+
+            // Pagina Nummers (Max 5 tonen om het netjes te houden)
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(totalPages, startPage + 4);
+            if(endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+
+            for (let i = startPage; i <= endPage; i++) {
+                const active = i === currentPage ? 'active' : '';
+                nav.innerHTML += `<li class="page-item ${active}"><button class="page-link" onclick="changePage(${i})">${i}</button></li>`;
+            }
+
+            // Volgende
+            const nextDisabled = currentPage === totalPages ? 'disabled' : '';
+            nav.innerHTML += `<li class="page-item ${nextDisabled}"><button class="page-link" onclick="changePage(${currentPage + 1})">${t('txt_next')}</button></li>`;
+        }
+
+        function changePage(p) {
+            currentPage = p;
+            renderTable();
         }
     </script>
 </body>
