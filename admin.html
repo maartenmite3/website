@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Panel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+</head>
+<body class="bg-light">
+
+    <nav class="navbar navbar-dark bg-danger mb-4">
+        <div class="container">
+            <span class="navbar-brand"><i class="bi bi-shield-lock-fill"></i> Admin Beheer</span>
+            <a href="/" class="btn btn-outline-light btn-sm">Terug naar Dashboard</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-dark text-white">Nieuwe Gebruiker</div>
+                    <div class="card-body">
+                        <form id="addUserForm">
+                            <div class="mb-2">
+                                <label>Gebruikersnaam</label>
+                                <input type="text" id="newUser" class="form-control" required>
+                            </div>
+                            <div class="mb-2">
+                                <label>Wachtwoord</label>
+                                <input type="text" id="newPass" class="form-control" required>
+                            </div>
+                            <div class="mb-3">
+                                <label>Rol</label>
+                                <select id="newRole" class="form-select">
+                                    <option value="user">Gebruiker</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-success w-100">Aanmaken</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white fw-bold">Gebruikersoverzicht</div>
+                    <div class="card-body p-0">
+                        <table class="table table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Naam</th>
+                                    <th>Rol</th>
+                                    <th>MFA</th>
+                                    <th>Actie</th>
+                                </tr>
+                            </thead>
+                            <tbody id="userTable">
+                                <tr><td colspan="5" class="text-center p-3">Laden...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Laad gebruikers bij start
+        loadUsers();
+
+        async function loadUsers() {
+            const res = await fetch('/api/admin-users');
+            if (!res.ok) {
+                if(res.status === 403) { 
+                    document.body.innerHTML = "<h1 class='text-center mt-5'>Geen toegang!</h1><p class='text-center'><a href='/'>Ga terug</a></p>";
+                }
+                return;
+            }
+            const users = await res.json();
+            
+            const tbody = document.getElementById('userTable');
+            tbody.innerHTML = '';
+
+            users.forEach(u => {
+                const row = `
+                    <tr>
+                        <td>${u.id}</td>
+                        <td>${u.username}</td>
+                        <td><span class="badge ${u.role === 'admin' ? 'bg-danger' : 'bg-primary'}">${u.role}</span></td>
+                        <td>${u.mfa_enabled ? '<i class="bi bi-check-circle-fill text-success"></i>' : '<span class="text-muted">-</span>'}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteUser(${u.id})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        }
+
+        // Nieuwe gebruiker toevoegen
+        document.getElementById('addUserForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('newUser').value;
+            const password = document.getElementById('newPass').value;
+            const role = document.getElementById('newRole').value;
+
+            const res = await fetch('/api/admin-users', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ username, password, role })
+            });
+
+            if(res.ok) {
+                alert('Gebruiker toegevoegd!');
+                document.getElementById('addUserForm').reset();
+                loadUsers();
+            } else {
+                alert('Fout: ' + await res.text());
+            }
+        };
+
+        // Verwijderen
+        async function deleteUser(id) {
+            if(!confirm('Weet je zeker dat je deze gebruiker wilt verwijderen?')) return;
+            
+            const res = await fetch('/api/admin-users', {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ id })
+            });
+
+            if(res.ok) loadUsers();
+            else alert(await res.text());
+        }
+    </script>
+</body>
+</html>

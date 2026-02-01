@@ -1,10 +1,12 @@
 import bcrypt from 'bcryptjs';
 
 // GET: User Info
+// GET: User Info
 export async function onRequestGet(context) {
   if (!context.data.user) return new Response('Niet ingelogd', { status: 401 });
   return Response.json({ 
     username: context.data.user.username,
+    role: context.data.user.role,          // <--- NIEUW: Stuur rol mee
     mfa_enabled: context.data.user.mfa_enabled 
   });
 }

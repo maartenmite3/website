@@ -27,6 +27,7 @@
                     <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#settingsModal">
                         <i class="bi bi-gear-fill"></i> Settings
                     </button>
+                    <a id="adminBtn" href="/admin.html" class="btn btn-danger btn-sm d-none">Admin Panel</a>
                     <a href="/api/logout" class="btn btn-danger btn-sm">Uitloggen</a>
                 </div>
             </div>
@@ -108,18 +109,20 @@
     <script>
         // --- 1. GEGEVENS LADEN ---
         // Haalt gebruikersnaam en MFA status op bij het laden van de pagina
-        fetch('/api/user')
-            .then(r => r.json())
-            .then(user => {
-                document.getElementById('username').innerText = user.username;
-                updateMfaUI(user.mfa_enabled);
-            })
-            .catch(err => {
-                console.error("Kon user niet laden", err);
-                // Als user niet geladen kan worden (bijv. sessie timeout), refresh pagina zodat middleware ingrijpt
-                if(err.status === 401) location.reload();
-            });
+// --- 1. GEGEVENS LADEN ---
+fetch('/api/user')
+    .then(r => r.json())
+    .then(user => {
+        document.getElementById('username').innerText = user.username;
+        updateMfaUI(user.mfa_enabled);
 
+        // NIEUW: Check of user admin is
+        if (user.role === 'admin') {
+            const btn = document.getElementById('adminBtn');
+            btn.classList.remove('d-none'); // Maak knop zichtbaar
+        }
+    })
+    // ... rest van de code
         // Functie om de juiste knoppen te tonen (Aan of Uit)
         function updateMfaUI(isEnabled) {
             const badge = document.getElementById('mfaStatus');
