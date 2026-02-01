@@ -6,48 +6,83 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        .cursor-pointer { cursor: pointer; }
+    </style>
 </head>
 <body class="bg-light">
 
     <nav class="navbar navbar-dark bg-dark mb-4">
         <div class="container">
             <span class="navbar-brand">Subscriptie Beheer</span>
-            <a href="/assets.html" class="btn btn-outline-light btn-sm">Terug naar Assets</a>
+            <div class="d-flex gap-3 align-items-center">
+                <a href="/assets.html" class="btn btn-outline-light btn-sm" data-i18n="btn_back">Terug naar Assets</a>
+                
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-translate"></i> <span id="currentLang">NL</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item cursor-pointer" onclick="setLanguage('nl')">🇳🇱 Nederlands</a></li>
+                        <li><a class="dropdown-item cursor-pointer" onclick="setLanguage('en')">🇬🇧 English</a></li>
+                    </ul>
+                </div>
+            </div>
         </div>
     </nav>
 
     <div class="container">
         <div class="d-flex justify-content-between mb-3">
-            <button class="btn btn-primary" onclick="openModal()"><i class="bi bi-plus-lg"></i> Nieuw</button>
-            <button class="btn btn-success" onclick="openImportModal()"><i class="bi bi-file-earmark-spreadsheet"></i> Import CSV</button>
+            <button class="btn btn-primary" onclick="openModal()">
+                <i class="bi bi-plus-lg"></i> <span data-i18n="btn_new">Nieuw</span>
+            </button>
+            <button class="btn btn-success" onclick="openImportModal()">
+                <i class="bi bi-file-earmark-spreadsheet"></i> <span data-i18n="btn_import">Import CSV</span>
+            </button>
         </div>
 
         <div class="card shadow-sm">
-            <table class="table table-hover mb-0 align-middle">
-                <thead class="table-light">
-                    <tr>
-                        <th>Naam</th>
-                        <th>GUID</th>
-                        <th>Verantwoordelijken</th>
-                        <th class="text-end">Actie</th>
-                    </tr>
-                </thead>
-                <tbody id="subTable"><tr><td colspan="4" class="p-3 text-center">Laden...</td></tr></tbody>
-            </table>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th data-i18n="th_name">Naam</th>
+                            <th>GUID</th>
+                            <th data-i18n="th_resp">Verantwoordelijken</th>
+                            <th class="text-end" data-i18n="th_action">Actie</th>
+                        </tr>
+                    </thead>
+                    <tbody id="subTable">
+                        <tr><td colspan="4" class="p-3 text-center" data-i18n="loading">Laden...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
     <div class="modal fade" id="subModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title" id="modalTitle">Subscriptie</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">Subscriptie</h5>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
                 <div class="modal-body">
                     <form id="subForm">
                         <input type="hidden" id="subId">
-                        <div class="mb-2"><label>Naam</label><input type="text" id="subName" class="form-control" required></div>
-                        <div class="mb-2"><label>GUID</label><input type="text" id="subGuid" class="form-control" required></div>
-                        <div class="mb-2"><label>Verantwoordelijken</label><input type="text" id="subResp" class="form-control" placeholder="bv. Jan, Piet"></div>
-                        <button type="submit" class="btn btn-success w-100 mt-3">Opslaan</button>
+                        <div class="mb-2">
+                            <label class="form-label" data-i18n="lbl_name">Naam</label>
+                            <input type="text" id="subName" class="form-control" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">GUID</label>
+                            <input type="text" id="subGuid" class="form-control" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label" data-i18n="lbl_resp">Verantwoordelijken</label>
+                            <input type="text" id="subResp" class="form-control" placeholder="bv. Jan, Piet">
+                        </div>
+                        <button type="submit" class="btn btn-success w-100 mt-3" data-i18n="btn_save">Opslaan</button>
                     </form>
                 </div>
             </div>
@@ -57,26 +92,30 @@
     <div class="modal fade" id="importModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title">Subscripties Importeren</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-header">
+                    <h5 class="modal-title" data-i18n="modal_import">Subscripties Importeren</h5>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Selecteer CSV bestand</label>
+                        <label class="form-label">CSV Bestand</label>
                         <input type="file" id="csvFile" class="form-control" accept=".csv">
                         <div class="form-text">Verwachte kolommen: <code>subscription_name, subscription_id</code></div>
                     </div>
-                    <button class="btn btn-primary mb-3" onclick="analyzeCSV()">Analyseren</button>
+                    <button class="btn btn-primary mb-3" onclick="analyzeCSV()" data-i18n="btn_analyze">Analyseren</button>
                     
                     <div id="importPreview" class="d-none">
-                        <h6>Resultaat Analyse:</h6>
-                        <ul class="nav nav-tabs" id="importTabs">
-                            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabNew">Nieuw (<span id="countNew">0</span>)</a></li>
-                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabExist">Bestaat al (<span id="countExist">0</span>)</a></li>
+                        <ul class="nav nav-tabs">
+                            <li class="nav-item">
+                                <a class="nav-link active" href="#" data-i18n="tab_new">Nieuw</a> (<span id="countNew">0</span>)
+                            </li>
                         </ul>
-                        <div class="tab-content border p-2 mb-3" style="max-height: 200px; overflow-y: auto;">
-                            <div class="tab-pane fade show active" id="tabNew"><table class="table table-sm text-success"><tbody id="listNew"></tbody></table></div>
-                            <div class="tab-pane fade" id="tabExist"><table class="table table-sm text-muted"><tbody id="listExist"></tbody></table></div>
+                        <div class="border p-2 mb-3" style="max-height: 200px; overflow-y: auto;">
+                            <table class="table table-sm table-striped">
+                                <tbody id="listNew"></tbody>
+                            </table>
                         </div>
-                        <button class="btn btn-success w-100" id="btnConfirmImport" onclick="executeImport()" disabled>Importeren Starten</button>
+                        <button class="btn btn-success w-100" id="btnConfirmImport" onclick="executeImport()" disabled data-i18n="btn_start">Start Import</button>
                     </div>
                 </div>
             </div>
@@ -85,36 +124,85 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // --- TRANSLATIONS ---
+        const translations = {
+            nl: {
+                btn_back: "Terug naar Assets", btn_new: "Nieuw", btn_import: "Import CSV",
+                th_name: "Naam", th_resp: "Verantwoordelijken", th_action: "Actie", loading: "Laden...",
+                lbl_name: "Naam", lbl_resp: "Verantwoordelijken", btn_save: "Opslaan",
+                modal_import: "Subscripties Importeren", btn_analyze: "Analyseren", tab_new: "Nieuw", btn_start: "Start Import",
+                alert_error: "Er is een fout opgetreden", alert_saved: "Opgeslagen", alert_confirm: "Zeker weten?", txt_no_data: "Geen data gevonden"
+            },
+            en: {
+                btn_back: "Back to Assets", btn_new: "New", btn_import: "Import CSV",
+                th_name: "Name", th_resp: "Responsibles", th_action: "Action", loading: "Loading...",
+                lbl_name: "Name", lbl_resp: "Responsibles", btn_save: "Save",
+                modal_import: "Import Subscriptions", btn_analyze: "Analyze", tab_new: "New", btn_start: "Start Import",
+                alert_error: "An error occurred", alert_saved: "Saved", alert_confirm: "Are you sure?", txt_no_data: "No data found"
+            }
+        };
+
+        function setLanguage(lang) {
+            localStorage.setItem('lang', lang);
+            applyLanguage();
+        }
+
+        function applyLanguage() {
+            const lang = localStorage.getItem('lang') || 'nl';
+            document.getElementById('currentLang').innerText = lang.toUpperCase();
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (translations[lang][key]) el.innerText = translations[lang][key];
+            });
+        }
+
+        function t(key) {
+            const lang = localStorage.getItem('lang') || 'nl';
+            return translations[lang][key] || key;
+        }
+
+        // --- GLOBAL VARS ---
         let importData = { new: [] };
         let allSubs = [];
 
+        // --- INIT ---
+        applyLanguage();
         loadSubs();
 
-        // --- LOAD ---
+        // --- LOAD DATA ---
         async function loadSubs() {
-            const res = await fetch('/api/subscriptions');
-            if(res.status === 401) return window.location.href = '/login.html';
-            allSubs = await res.json();
-            
-            const tbody = document.getElementById('subTable');
-            // AANPASSING: Aparte kolommen voor Naam en GUID
-            tbody.innerHTML = allSubs.map(s => `
-                <tr>
-                    <td class="fw-bold">${s.name}</td>
-                    <td class="font-monospace text-muted">${s.guid}</td>
-                    <td>${s.responsibles || '-'}</td>
-                    <td class="text-end">
-                        <button class="btn btn-sm btn-outline-primary" onclick="openEdit(${s.id})"><i class="bi bi-pencil"></i></button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="delSub(${s.id})"><i class="bi bi-trash"></i></button>
-                    </td>
-                </tr>`).join('');
+            try {
+                const res = await fetch('/api/subscriptions');
+                if (res.status === 401) return window.location.href = '/login.html';
+                
+                allSubs = await res.json();
+                const tbody = document.getElementById('subTable');
+                
+                tbody.innerHTML = allSubs.map(s => `
+                    <tr>
+                        <td class="fw-bold">${s.name}</td>
+                        <td class="font-monospace text-muted">${s.guid}</td>
+                        <td>${s.responsibles || '-'}</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-primary" onclick="openEdit(${s.id})">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="delSub(${s.id})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                console.error(e);
+            }
         }
 
-        // --- CRUD ---
+        // --- CRUD FUNCTIES ---
         function openModal() {
             document.getElementById('subForm').reset();
             document.getElementById('subId').value = '';
-            document.getElementById('modalTitle').innerText = 'Nieuwe Subscriptie';
+            document.getElementById('modalTitle').innerText = t('btn_new');
             new bootstrap.Modal(document.getElementById('subModal')).show();
         }
 
@@ -124,7 +212,7 @@
             document.getElementById('subName').value = s.name;
             document.getElementById('subGuid').value = s.guid;
             document.getElementById('subResp').value = s.responsibles;
-            document.getElementById('modalTitle').innerText = 'Subscriptie Bewerken';
+            document.getElementById('modalTitle').innerText = 'Edit';
             new bootstrap.Modal(document.getElementById('subModal')).show();
         }
 
@@ -137,30 +225,33 @@
                 guid: document.getElementById('subGuid').value,
                 responsibles: document.getElementById('subResp').value
             };
-            
+
             const method = id ? 'PUT' : 'POST';
             const res = await fetch('/api/subscriptions', {
                 method: method,
-                headers: {'Content-Type':'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
 
-            if(res.ok) {
+            if (res.ok) {
                 bootstrap.Modal.getInstance(document.getElementById('subModal')).hide();
                 loadSubs();
             } else {
-                alert("Fout: " + await res.text());
+                alert(t('alert_error') + ": " + await res.text());
             }
         };
 
         async function delSub(id) {
-            if(confirm('Wissen?')) { 
-                await fetch('/api/subscriptions', { method: 'DELETE', body: JSON.stringify({id}) }); 
-                loadSubs(); 
+            if (confirm(t('alert_confirm'))) {
+                await fetch('/api/subscriptions', {
+                    method: 'DELETE',
+                    body: JSON.stringify({ id })
+                });
+                loadSubs();
             }
         }
 
-        // --- IMPORT LOGIC ---
+        // --- IMPORT FUNCTIES ---
         function openImportModal() {
             document.getElementById('importPreview').classList.add('d-none');
             document.getElementById('csvFile').value = '';
@@ -169,64 +260,70 @@
 
         function analyzeCSV() {
             const file = document.getElementById('csvFile').files[0];
-            if(!file) return alert("Kies een bestand");
+            if (!file) return alert('Selecteer een bestand');
 
             const reader = new FileReader();
             reader.onload = async (e) => {
-                const text = e.target.result;
-                const rows = csvToJSON(text);
+                const rows = csvToJSON(e.target.result);
+                if (rows.length === 0) {
+                    alert(t('txt_no_data'));
+                    return;
+                }
 
-                if(rows.length === 0) { alert("Geen data gevonden."); return; }
-                
                 const res = await fetch('/api/import-handler', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ mode: 'check', type: 'subscriptions', data: rows })
                 });
-                
+
                 const report = await res.json();
                 importData.new = report.new;
 
-                document.getElementById('countNew').innerText = report.new.length;
-                document.getElementById('countExist').innerText = report.existing.length;
+                document.getElementById('listNew').innerHTML = report.new.map(i => `
+                    <tr><td>${i.name}</td><td>${i.guid}</td></tr>
+                `).join('');
                 
-                document.getElementById('listNew').innerHTML = report.new.map(i => `<tr><td><i class="bi bi-plus-circle"></i> ${i.name}</td><td>${i.guid}</td></tr>`).join('');
-                document.getElementById('listExist').innerHTML = report.existing.map(i => `<tr><td>${i.name} (Bestaat al)</td><td>${i.guid}</td></tr>`).join('');
-
                 document.getElementById('importPreview').classList.remove('d-none');
-                const btn = document.getElementById('btnConfirmImport');
-                btn.disabled = report.new.length === 0;
-                btn.innerText = `Importeer ${report.new.length} items`;
+                document.getElementById('btnConfirmImport').disabled = report.new.length === 0;
+                document.getElementById('btnConfirmImport').innerText = `${t('btn_start')} (${report.new.length})`;
             };
             reader.readAsText(file);
         }
 
         async function executeImport() {
-            if(!confirm(`Start import?`)) return;
+            if (!confirm(t('alert_confirm'))) return;
+
             const res = await fetch('/api/import-handler', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ mode: 'execute', type: 'subscriptions', data: importData.new })
             });
 
-            if(res.ok) {
-                alert("Import succesvol!");
+            if (res.ok) {
+                alert(t('alert_saved'));
                 bootstrap.Modal.getInstance(document.getElementById('importModal')).hide();
                 loadSubs();
-            } else alert("Er ging iets mis.");
+            } else {
+                alert(t('alert_error'));
+            }
         }
 
         function csvToJSON(csv) {
             const lines = csv.split(/\r?\n/);
-            if(lines.length < 1) return [];
+            if (lines.length < 1) return [];
+            
+            // Verwijder BOM en quotes van headers
             const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').replace(/^\uFEFF/, ''));
-
             const result = [];
-            for(let i=1; i<lines.length; i++) {
-                if(!lines[i].trim()) continue;
+
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+                
+                // Simpele split op komma
                 const currentline = lines[i].split(',');
                 const obj = {};
-                for(let j=0; j<headers.length; j++) {
+                
+                for (let j = 0; j < headers.length; j++) {
                     const val = currentline[j] ? currentline[j].trim().replace(/^"|"$/g, '') : '';
                     obj[headers[j]] = val;
                 }

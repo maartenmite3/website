@@ -18,6 +18,7 @@
         #networkGraph { width: 100%; height: 600px; border: 1px solid #ddd; background-color: #f8f9fa; }
         .asset-icon-img { width: 24px; height: 24px; vertical-align: middle; margin-right: 10px; }
         .pagination { margin-top: 1rem; margin-bottom: 2rem; }
+        .cursor-pointer { cursor: pointer; }
     </style>
 </head>
 <body class="bg-light">
@@ -25,26 +26,33 @@
     <nav class="navbar navbar-dark bg-dark mb-4">
         <div class="container">
             <span class="navbar-brand"><i class="bi bi-shield-shaded"></i> Asset Inventory</span>
-            <div>
-                <a href="/subscriptions.html" class="btn btn-outline-info btn-sm me-2">Beheer Subscripties</a>
-                <a href="/" class="btn btn-outline-light btn-sm">Dashboard</a>
+            <div class="d-flex gap-3 align-items-center">
+                <a href="/subscriptions.html" class="btn btn-outline-info btn-sm" data-i18n="btn_manage_subs">Beheer Subscripties</a>
+                <a href="/" class="btn btn-outline-light btn-sm" data-i18n="btn_dashboard">Dashboard</a>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-translate"></i> <span id="currentLang">NL</span></button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item cursor-pointer" onclick="setLanguage('nl')">🇳🇱 Nederlands</a></li>
+                        <li><a class="dropdown-item cursor-pointer" onclick="setLanguage('en')">🇬🇧 English</a></li>
+                    </ul>
+                </div>
             </div>
         </div>
     </nav>
 
     <div class="container-fluid px-4">
-        <div class="d-flex justify-content-between mb-3 align-items-center">
+        <div class="d-flex justify-content-between mb-3 align-items-center flex-wrap gap-2">
             <div>
-                <button class="btn btn-primary" onclick="openCreateModal()"><i class="bi bi-plus-lg"></i> Nieuwe Asset</button>
-                <button class="btn btn-success ms-2" onclick="openImportModal()"><i class="bi bi-file-earmark-spreadsheet"></i> Import</button>
-                <button class="btn btn-outline-dark ms-2" onclick="exportCSV()"><i class="bi bi-download"></i> Export</button>
+                <button class="btn btn-primary" onclick="openCreateModal()"><i class="bi bi-plus-lg"></i> <span data-i18n="btn_new_asset">Nieuwe Asset</span></button>
+                <button class="btn btn-success ms-2" onclick="openImportModal()"><i class="bi bi-file-earmark-spreadsheet"></i> <span data-i18n="btn_import">Import</span></button>
+                <button class="btn btn-outline-dark ms-2" onclick="exportCSV()"><i class="bi bi-download"></i> <span data-i18n="btn_export">Export</span></button>
             </div>
             
             <div class="d-flex gap-2 align-items-center">
                 <select id="limitSelect" class="form-select" style="width:auto;" onchange="changeLimit()">
-                    <option value="25">25</option><option value="50">50</option><option value="100">100</option><option value="all">Alles</option>
+                    <option value="25">25</option><option value="50">50</option><option value="100">100</option><option value="all" data-i18n="opt_all">Alles</option>
                 </select>
-                <button class="btn btn-outline-secondary" onclick="toggleGlobalReveal()" id="globalEyeBtn" title="Toon/Verberg alle gevoelige data"><i class="bi bi-eye"></i></button>
+                <button class="btn btn-outline-secondary" onclick="toggleGlobalReveal()" id="globalEyeBtn" title="Toon/Verberg gevoelige data"><i class="bi bi-eye"></i></button>
                 <input type="text" id="searchBar" class="form-control" placeholder="Zoeken..." oninput="handleSearch()">
             </div>
         </div>
@@ -53,9 +61,19 @@
             <div class="card-body p-0">
                 <table class="table table-hover mb-0 align-middle text-nowrap">
                     <thead class="table-light">
-                        <tr><th>Asset</th><th>IPs</th><th>Subscriptie</th><th>Eigenaar</th><th>Labels</th><th>CIS</th><th>Vulns</th><th>Class</th><th class="text-end">Actie</th></tr>
+                        <tr>
+                            <th data-i18n="th_asset">Asset</th>
+                            <th data-i18n="th_ips">IPs</th>
+                            <th data-i18n="th_sub">Subscriptie</th>
+                            <th data-i18n="th_owner">Eigenaar</th>
+                            <th data-i18n="th_labels">Labels</th>
+                            <th>CIS</th>
+                            <th data-i18n="th_vulns">Vulns</th>
+                            <th data-i18n="th_class">Class</th>
+                            <th class="text-end" data-i18n="th_action">Actie</th>
+                        </tr>
                     </thead>
-                    <tbody id="assetTable"><tr><td colspan="9" class="p-4 text-center">Laden...</td></tr></tbody>
+                    <tbody id="assetTable"><tr><td colspan="9" class="p-4 text-center" data-i18n="loading">Laden...</td></tr></tbody>
                 </table>
             </div>
         </div>
@@ -71,15 +89,15 @@
                     <form id="assetForm">
                         <input type="hidden" id="assetId">
                         <div class="row g-3">
-                            <div class="col-md-6"><label>Naam</label><input type="text" id="name" class="form-control" required></div>
+                            <div class="col-md-6"><label data-i18n="lbl_name">Naam</label><input type="text" id="name" class="form-control" required></div>
                             <div class="col-md-3"><label>Type</label><select id="type" class="form-select"><option>Virtual Machine</option><option>SQL Database</option><option>App Service</option><option>Firewall</option><option>Network Interface</option><option>Key Vault</option><option>Storage Account</option><option>Recovery Services Vault</option><option>Private Endpoint</option></select></div>
                             <div class="col-md-3"><label>CIS Score</label><input type="number" id="cis" class="form-control" placeholder="0-100"></div>
-                            <div class="col-md-6"><label>Subscriptie</label><select id="subSelect" class="form-select"></select></div>
-                            <div class="col-md-6"><label class="text-danger">Eigenaar</label><input type="text" id="owner" class="form-control"></div>
-                            <div class="col-md-12"><label class="text-danger">IP Adres(sen)</label><input type="text" id="ip" class="form-control" placeholder="10.0.0.1, 192.168.1.5"></div>
-                            <div class="col-md-6"><label>Classificatie</label><select id="classif" class="form-select"><option>Public</option><option>Internal</option><option>Confidential</option></select></div>
+                            <div class="col-md-6"><label data-i18n="lbl_sub">Subscriptie</label><select id="subSelect" class="form-select"></select></div>
+                            <div class="col-md-6"><label class="text-danger" data-i18n="lbl_owner">Eigenaar</label><input type="text" id="owner" class="form-control"></div>
+                            <div class="col-md-12"><label class="text-danger" data-i18n="lbl_ips">IP Adres(sen)</label><input type="text" id="ip" class="form-control" placeholder="10.0.0.1, ..."></div>
+                            <div class="col-md-6"><label data-i18n="lbl_class">Classificatie</label><select id="classif" class="form-select"><option>Public</option><option>Internal</option><option>Confidential</option></select></div>
                             <div class="col-md-6">
-                                <label>Data Gevoeligheid</label>
+                                <label data-i18n="lbl_sens">Data Gevoeligheid</label>
                                 <div class="d-flex gap-2 flex-wrap">
                                     <div class="form-check"><input class="form-check-input sens-check" type="checkbox" value="PII" id="c1"><label for="c1">PII</label></div>
                                     <div class="form-check"><input class="form-check-input sens-check" type="checkbox" value="PHI" id="c2"><label for="c2">PHI</label></div>
@@ -89,7 +107,7 @@
                         </div>
                     </form>
                 </div>
-                <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Annuleren</button><button class="btn btn-success" onclick="saveAsset()">Opslaan</button></div>
+                <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="btn_cancel">Annuleren</button><button class="btn btn-success" onclick="saveAsset()" data-i18n="btn_save">Opslaan</button></div>
             </div>
         </div>
     </div>
@@ -100,46 +118,46 @@
                 <div class="modal-header"><h5 class="modal-title" id="detailTitle">Details</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body p-0">
                     <ul class="nav nav-tabs nav-fill bg-light" role="tablist">
-                        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabVuln">🛑 Kwetsbaarheden</a></li>
-                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabCis">✅ CIS</a></li>
-                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabRel">🔗 Relaties</a></li>
-                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabHist">🕒 Geschiedenis</a></li>
+                        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabVuln" data-i18n="tab_vuln">🛑 Kwetsbaarheden</a></li>
+                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabCis" data-i18n="tab_cis">✅ CIS</a></li>
+                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabRel" data-i18n="tab_rel">🔗 Relaties</a></li>
+                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabHist" data-i18n="tab_hist">🕒 Geschiedenis</a></li>
                     </ul>
                     <div class="tab-content p-3">
                         <div class="tab-pane fade show active" id="tabVuln">
                             <form id="vulnForm" class="row g-2 mb-3 bg-light p-2 border rounded">
-                                <div class="col-md-3"><input type="text" id="vName" class="form-control form-control-sm" placeholder="Kwetsbaarheid"></div>
+                                <div class="col-md-3"><input type="text" id="vName" class="form-control form-control-sm" placeholder="Naam"></div>
                                 <div class="col-md-2"><select id="vSev" class="form-select form-select-sm"><option>Critical</option><option>High</option><option>Medium</option></select></div>
                                 <div class="col-md-3"><select id="vStat" class="form-select form-select-sm"><option>Open</option><option>Tijdelijke Uitzondering</option></select></div>
                                 <div class="col-md-2"><input type="date" id="vDate" class="form-control form-control-sm"></div>
-                                <div class="col-md-2"><button type="button" onclick="addVuln()" class="btn btn-sm btn-success w-100">Toevoegen</button></div>
+                                <div class="col-md-2"><button type="button" onclick="addVuln()" class="btn btn-sm btn-success w-100" data-i18n="btn_add">Toevoegen</button></div>
                             </form>
-                            <table class="table table-sm table-striped"><thead><tr><th>Naam</th><th>Severity</th><th>Status</th><th>Einddatum</th><th>Actie</th></tr></thead><tbody id="vulnTable"></tbody></table>
+                            <table class="table table-sm table-striped"><thead><tr><th data-i18n="th_name">Naam</th><th>Severity</th><th>Status</th><th data-i18n="th_date">Datum</th><th></th></tr></thead><tbody id="vulnTable"></tbody></table>
                         </div>
                         <div class="tab-pane fade" id="tabCis">
                             <form id="cisForm" class="row g-2 mb-3 bg-light p-2 border rounded">
                                 <div class="col-md-2"><input type="text" id="cId" class="form-control form-control-sm" placeholder="ID"></div>
-                                <div class="col-md-5"><input type="text" id="cDesc" class="form-control form-control-sm" placeholder="Omschrijving"></div>
+                                <div class="col-md-5"><input type="text" id="cDesc" class="form-control form-control-sm" placeholder="Beschrijving"></div>
                                 <div class="col-md-3"><input type="text" id="cJust" class="form-control form-control-sm" placeholder="Reden"></div>
-                                <div class="col-md-2"><button type="button" onclick="addCis()" class="btn btn-sm btn-success w-100">Toevoegen</button></div>
+                                <div class="col-md-2"><button type="button" onclick="addCis()" class="btn btn-sm btn-success w-100" data-i18n="btn_add">Toevoegen</button></div>
                             </form>
-                            <table class="table table-sm table-striped"><thead><tr><th>ID</th><th>Omschrijving</th><th>Reden</th><th>Actie</th></tr></thead><tbody id="cisTable"></tbody></table>
+                            <table class="table table-sm table-striped"><thead><tr><th>ID</th><th data-i18n="th_desc">Beschrijving</th><th data-i18n="th_reason">Reden</th><th></th></tr></thead><tbody id="cisTable"></tbody></table>
                         </div>
                         <div class="tab-pane fade" id="tabRel">
                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                <div class="alert alert-info py-2 small mb-0 flex-grow-1 me-3">Koppel assets om afhankelijkheden in kaart te brengen.</div>
-                                <button class="btn btn-primary shadow-sm" onclick="openNetworkModal()"><i class="bi bi-diagram-3-fill"></i> Toon Netwerk (Threat Model)</button>
+                                <div class="alert alert-info py-2 small mb-0 flex-grow-1 me-3" data-i18n="rel_info">Koppel assets om afhankelijkheden in kaart te brengen.</div>
+                                <button class="btn btn-primary shadow-sm" onclick="openNetworkModal()"><i class="bi bi-diagram-3-fill"></i> <span data-i18n="btn_show_network">Toon Netwerk</span></button>
                             </div>
                             <form id="relForm" class="row g-2 mb-3 bg-light p-2 border rounded align-items-center">
-                                <div class="col-auto">Deze asset...</div>
+                                <div class="col-auto" data-i18n="lbl_this_asset">Deze asset...</div>
                                 <div class="col-md-3"><select id="rType" class="form-select form-select-sm"><option value="Draait op">Draait op</option><option value="Verbonden met">Verbonden met</option><option value="Afhankelijk van">Afhankelijk van</option></select></div>
                                 <div class="col-md-4"><select id="rTarget" class="form-select form-select-sm"><option>Laden...</option></select></div>
-                                <div class="col-md-2"><button type="button" onclick="addRel()" class="btn btn-sm btn-success w-100">Koppelen</button></div>
+                                <div class="col-md-2"><button type="button" onclick="addRel()" class="btn btn-sm btn-success w-100" data-i18n="btn_link">Koppelen</button></div>
                             </form>
-                            <h6>Afhankelijkheden (Downstream)</h6><table class="table table-sm table-bordered mb-3"><tbody id="relDownTable"></tbody></table>
-                            <h6>Wordt gebruikt door (Upstream)</h6><table class="table table-sm table-bordered"><tbody id="relUpTable"></tbody></table>
+                            <h6 data-i18n="hdr_downstream">Afhankelijkheden (Downstream)</h6><table class="table table-sm table-bordered mb-3"><tbody id="relDownTable"></tbody></table>
+                            <h6 data-i18n="hdr_upstream">Wordt gebruikt door (Upstream)</h6><table class="table table-sm table-bordered"><tbody id="relUpTable"></tbody></table>
                         </div>
-                        <div class="tab-pane fade" id="tabHist"><table class="table table-sm text-muted small"><thead><tr><th>Tijd</th><th>Wie</th><th>Type</th></tr></thead><tbody id="histTable"></tbody></table></div>
+                        <div class="tab-pane fade" id="tabHist"><table class="table table-sm text-muted small"><thead><tr><th data-i18n="th_time">Tijd</th><th data-i18n="th_who">Wie</th><th>Type</th></tr></thead><tbody id="histTable"></tbody></table></div>
                     </div>
                 </div>
             </div>
@@ -149,31 +167,19 @@
     <div class="modal fade" id="networkModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header bg-dark text-white">
-                    <h5 class="modal-title"><i class="bi bi-diagram-2"></i> Threat Model & Netwerk</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
+                <div class="modal-header bg-dark text-white"><h5 class="modal-title"><i class="bi bi-diagram-2"></i> <span data-i18n="modal_network">Netwerk Overzicht</span></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body p-0 position-relative">
                     <div id="networkGraph"></div>
-                    
                     <div class="position-absolute top-0 end-0 m-3 d-flex gap-2">
-                        <button class="btn btn-light shadow-sm border btn-sm" onclick="togglePhysics()" id="physBtn" title="Zet 'veren' aan/uit">
-                            <i class="bi bi-play-fill"></i> Organiseren
-                        </button>
-                        <button class="btn btn-primary shadow-sm border btn-sm" onclick="saveLayout()">
-                            <i class="bi bi-save"></i> Layout Opslaan
-                        </button>
-                        <button class="btn btn-light shadow-sm border btn-sm" onclick="exportNetworkImage()">
-                            <i class="bi bi-camera"></i> Foto
-                        </button>
+                        <button class="btn btn-light shadow-sm border btn-sm" onclick="togglePhysics()" id="physBtn"><i class="bi bi-play-fill"></i> Organiseren</button>
+                        <button class="btn btn-primary shadow-sm border btn-sm" onclick="saveLayout()"><i class="bi bi-save"></i> Opslaan</button>
+                        <button class="btn btn-light shadow-sm border btn-sm" onclick="exportNetworkImage()"><i class="bi bi-camera"></i> Foto</button>
                     </div>
-
                     <div class="position-absolute bottom-0 start-0 m-3 small bg-white p-2 rounded border shadow-sm">
-                        <div id="threatAlert" class="text-danger fw-bold mb-1 d-none"><i class="bi bi-exclamation-triangle"></i> Cross-Subscription Detected!</div>
-                        <div><span style="color:#0d6efd">●</span> Huidige Asset</div>
+                        <div id="threatAlert" class="text-danger fw-bold mb-1 d-none"><i class="bi bi-exclamation-triangle"></i> Cross-Subscription!</div>
+                        <div><span style="color:#0d6efd">●</span> Asset</div>
                         <div><span style="color:#ffc107">●</span> Downstream</div>
                         <div><span style="color:#198754">●</span> Upstream</div>
-                        <div class="mt-1 border-top pt-1"><span style="border-bottom: 2px dashed red;">---</span> Cross-Sub Verbinding</div>
                     </div>
                 </div>
             </div>
@@ -183,14 +189,14 @@
     <div class="modal fade" id="importModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title">Importeren</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-header"><h5 class="modal-title" data-i18n="modal_import">Importeren</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body">
                     <input type="file" id="csvFile" class="form-control mb-3" accept=".csv">
-                    <button class="btn btn-primary mb-3" onclick="analyzeCSV()">Analyseren</button>
+                    <button class="btn btn-primary mb-3" onclick="analyzeCSV()" data-i18n="btn_analyze">Analyseren</button>
                     <div id="importPreview" class="d-none">
-                        <ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" href="#">Nieuw (<span id="countNew">0</span>)</a></li></ul>
+                        <ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" href="#" data-i18n="tab_new">Nieuw</a> (<span id="countNew">0</span>)</li></ul>
                         <div class="border p-2 mb-3" style="max-height:200px;overflow-y:auto"><table class="table table-sm"><tbody id="listNew"></tbody></table></div>
-                        <button class="btn btn-success w-100" id="btnConfirmImport" onclick="executeImport()" disabled>Start Import</button>
+                        <button class="btn btn-success w-100" id="btnConfirmImport" onclick="executeImport()" disabled data-i18n="btn_start_import">Start Import</button>
                     </div>
                 </div>
             </div>
@@ -199,15 +205,55 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        let allAssets = []; let allSubs = []; let currentAssetId = null; 
-        let currentRelationships = null; let currentLayout = null;
+        // --- TRANSLATIONS CONFIG ---
+        const translations = {
+            nl: {
+                btn_manage_subs: "Beheer Subscripties", btn_dashboard: "Dashboard", btn_new_asset: "Nieuwe Asset", btn_import: "Import", btn_export: "Export", opt_all: "Alles",
+                th_asset: "Asset", th_ips: "IPs", th_sub: "Subscriptie", th_owner: "Eigenaar", th_labels: "Labels", th_vulns: "Vulns", th_class: "Class", th_action: "Actie", loading: "Laden...",
+                lbl_name: "Naam", lbl_sub: "Subscriptie", lbl_owner: "Eigenaar", lbl_ips: "IP Adres(sen)", lbl_class: "Classificatie", lbl_sens: "Data Gevoeligheid",
+                btn_cancel: "Annuleren", btn_save: "Opslaan", btn_add: "Toevoegen", btn_link: "Koppelen", btn_show_network: "Toon Netwerk",
+                tab_vuln: "🛑 Kwetsbaarheden", tab_cis: "✅ CIS", tab_rel: "🔗 Relaties", tab_hist: "🕒 Geschiedenis",
+                th_name: "Naam", th_date: "Datum", th_desc: "Beschrijving", th_reason: "Reden", th_time: "Tijd", th_who: "Wie",
+                hdr_downstream: "Afhankelijkheden (Downstream)", hdr_upstream: "Wordt gebruikt door (Upstream)", rel_info: "Koppel assets om afhankelijkheden in kaart te brengen.", lbl_this_asset: "Deze asset...",
+                modal_network: "Netwerk Overzicht", modal_import: "Importeren", btn_analyze: "Analyseren", tab_new: "Nieuw", btn_start_import: "Start Import",
+                txt_prev: "Vorige", txt_next: "Volgende", txt_no_data: "Geen data", alert_saved: "Opgeslagen", alert_deleted: "Verwijderd", alert_confirm: "Zeker weten?"
+            },
+            en: {
+                btn_manage_subs: "Manage Subscriptions", btn_dashboard: "Dashboard", btn_new_asset: "New Asset", btn_import: "Import", btn_export: "Export", opt_all: "All",
+                th_asset: "Asset", th_ips: "IPs", th_sub: "Subscription", th_owner: "Owner", th_labels: "Labels", th_vulns: "Vulns", th_class: "Class", th_action: "Action", loading: "Loading...",
+                lbl_name: "Name", lbl_sub: "Subscription", lbl_owner: "Owner", lbl_ips: "IP Address(es)", lbl_class: "Classification", lbl_sens: "Data Sensitivity",
+                btn_cancel: "Cancel", btn_save: "Save", btn_add: "Add", btn_link: "Link", btn_show_network: "Show Network",
+                tab_vuln: "🛑 Vulnerabilities", tab_cis: "✅ CIS", tab_rel: "🔗 Relations", tab_hist: "🕒 History",
+                th_name: "Name", th_date: "Date", th_desc: "Description", th_reason: "Reason", th_time: "Time", th_who: "Who",
+                hdr_downstream: "Dependencies (Downstream)", hdr_upstream: "Used by (Upstream)", rel_info: "Link assets to map dependencies.", lbl_this_asset: "This asset...",
+                modal_network: "Network Overview", modal_import: "Import", btn_analyze: "Analyze", tab_new: "New", btn_start_import: "Start Import",
+                txt_prev: "Previous", txt_next: "Next", txt_no_data: "No data", alert_saved: "Saved", alert_deleted: "Deleted", alert_confirm: "Are you sure?"
+            }
+        };
+
+        // --- I18N LOGIC ---
+        function setLanguage(lang) { localStorage.setItem('lang', lang); applyLanguage(); }
+        function applyLanguage() {
+            const lang = localStorage.getItem('lang') || 'nl';
+            document.getElementById('currentLang').innerText = lang.toUpperCase();
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if(translations[lang][key]) el.innerText = translations[lang][key];
+            });
+            // Update table als die er is
+            if(allAssets.length > 0) renderPagination(); 
+        }
+        function t(key) { const lang = localStorage.getItem('lang') || 'nl'; return translations[lang][key] || key; }
+
+        // --- GLOBAL VARS ---
+        let allAssets = []; let allSubs = []; let currentAssetId = null; let currentRelationships = null; let currentLayout = null;
         let isGlobalRevealed = false; let importData = { new: [] }; let searchTimeout = null; let networkInstance = null;
         let currentPage = 1; let totalPages = 1;
 
         // INIT
+        applyLanguage();
         loadSubs();
 
-        // --- IMAGE MAPPING ---
         function getAssetImage(name, type) {
             const n = name.toLowerCase(); const t = (type || '').toLowerCase();
             if (n.includes('kv') || n.includes('keyvault')) return '/icons/keyvault.svg';
@@ -218,13 +264,12 @@
             return '/icons/nic.svg';
         }
 
-        // --- LOADERS ---
         async function loadSubs() {
             const res = await fetch('/api/subscriptions');
             if(res.ok) {
                 allSubs = await res.json();
                 const sel = document.getElementById('subSelect');
-                sel.innerHTML = '<option value="">Kies...</option>';
+                sel.innerHTML = '<option value="">...</option>';
                 allSubs.forEach(s => sel.innerHTML += `<option value="${s.guid}">${s.name}</option>`);
                 loadAssets();
             }
@@ -235,7 +280,10 @@
             const query = document.getElementById('searchBar').value;
             currentPage = page;
             let url = `/api/assets?limit=${limit}&page=${page}`; if(query) url += `&q=${encodeURIComponent(query)}`;
-            const tbody = document.getElementById('assetTable'); tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center">Laden...</td></tr>';
+            
+            const tbody = document.getElementById('assetTable');
+            tbody.innerHTML = `<tr><td colspan="9" class="p-4 text-center">${t('loading')}</td></tr>`;
+            
             const res = await fetch(url);
             if(res.status === 401) return window.location.href='/login.html';
             const response = await res.json();
@@ -245,7 +293,7 @@
 
         function renderTable(data) {
             const tbody = document.getElementById('assetTable'); tbody.innerHTML = '';
-            if(data.length===0) return tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center">Geen resultaten</td></tr>';
+            if(data.length===0) return tbody.innerHTML = `<tr><td colspan="9" class="p-4 text-center">${t('txt_no_data')}</td></tr>`;
             data.forEach(a => {
                 let rCls = a.classification==='Confidential'?'confidential':(a.classification==='Internal'?'internal':'public');
                 let vBadge = a.vuln_count>0?`<span class="badge bg-danger">${a.vuln_count}</span>`:`<span class="badge bg-success">0</span>`;
@@ -264,212 +312,116 @@
             const nav = document.getElementById('paginationControls'); nav.innerHTML = '';
             if(totalPages <= 1) return;
             const prevDisabled = currentPage === 1 ? 'disabled' : '';
-            nav.innerHTML += `<li class="page-item ${prevDisabled}"><a class="page-link" href="#" onclick="changePage(${currentPage - 1})">Vorige</a></li>`;
+            nav.innerHTML += `<li class="page-item ${prevDisabled}"><a class="page-link" href="#" onclick="changePage(${currentPage - 1})">${t('txt_prev')}</a></li>`;
             let start = Math.max(1, currentPage - 3); let end = Math.min(totalPages, start + 6);
             if(end - start < 6) start = Math.max(1, end - 6);
             if(start > 1) nav.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="changePage(1)">1</a>...</li>`;
             for(let i=start; i<=end; i++) nav.innerHTML += `<li class="page-item ${i===currentPage?'active':''}"><a class="page-link" href="#" onclick="changePage(${i})">${i}</a></li>`;
             if(end < totalPages) nav.innerHTML += `<li class="page-item">...<a class="page-link" href="#" onclick="changePage(${totalPages})">${totalPages}</a></li>`;
             const nextDisabled = currentPage === totalPages ? 'disabled' : '';
-            nav.innerHTML += `<li class="page-item ${nextDisabled}"><a class="page-link" href="#" onclick="changePage(${currentPage + 1})">Volgende</a></li>`;
+            nav.innerHTML += `<li class="page-item ${nextDisabled}"><a class="page-link" href="#" onclick="changePage(${currentPage + 1})">${t('txt_next')}</a></li>`;
         }
         function changePage(p) { if(p<1||p>totalPages) return; loadAssets(p); }
         function handleSearch() { clearTimeout(searchTimeout); searchTimeout = setTimeout(() => loadAssets(1), 300); }
         function changeLimit() { loadAssets(1); }
         function toggleGlobalReveal() { isGlobalRevealed = !isGlobalRevealed; const btn = document.getElementById('globalEyeBtn'); const icon = btn.querySelector('i'); if (isGlobalRevealed) { btn.className='btn btn-warning'; icon.className='bi bi-eye-slash'; } else { btn.className='btn btn-outline-secondary'; icon.className='bi bi-eye'; } document.querySelectorAll('.masked-data').forEach(el => el.classList.toggle('revealed', isGlobalRevealed)); }
 
-        // --- NETWORK GRAPH (THREAT MODELING & SAVED LAYOUT) ---
+        // --- NETWORK GRAPH ---
         function openNetworkModal() {
-            if(!currentRelationships) return alert("Geen data");
+            if(!currentRelationships) return alert(t('txt_no_data'));
             new bootstrap.Modal(document.getElementById('networkModal')).show();
             setTimeout(drawNetwork, 500);
         }
-
         function drawNetwork() {
             const nodes = []; const edges = [];
             const currentName = document.getElementById('detailTitle').innerText.replace('Details voor: ', '');
-            
-            // Haal de centrale asset op uit de geladen set
             const currentAsset = allAssets.find(a => a.id == currentAssetId) || { name: currentName, type: '', subscription_id: 'unknown' };
             const currentSub = currentAsset.subscription_id;
             const currentImg = getAssetImage(currentName, currentAsset.type);
-
-            // Centraal Node
-            // Check of we opgeslagen positie hebben
+            
             let pos = { x: undefined, y: undefined };
             if (currentLayout && currentLayout[currentAssetId]) pos = currentLayout[currentAssetId];
 
-            nodes.push({ 
-                id: currentAssetId, 
-                label: currentName, 
-                shape: 'image', 
-                image: currentImg, 
-                size: 40, 
-                font: { color: '#000', multi: true, bold: true },
-                x: pos.x, y: pos.y
-            });
-            
+            nodes.push({ id: currentAssetId, label: currentName, shape: 'image', image: currentImg, size: 40, font: { color: '#000', multi: true, bold: true }, x: pos.x, y: pos.y });
             let threatFound = false;
 
-            // Helper om node en edge toe te voegen met Zero Trust Check
             const addLinkedNode = (r, color) => {
                 const img = getAssetImage(r.name, r.type);
                 let nodePos = { x: undefined, y: undefined };
                 if (currentLayout && currentLayout[r.linked_asset_id]) nodePos = currentLayout[r.linked_asset_id];
-
-                // ZERO TRUST CHECK: Is Subscriptie anders?
                 const isCrossSub = r.enc_sub_id !== currentSub && r.enc_sub_id !== 'unknown' && currentSub !== 'unknown';
                 if (isCrossSub) threatFound = true;
-
-                // Node eigenschappen bij Threat
                 const borderWidth = isCrossSub ? 4 : 1;
-                const borderColor = isCrossSub ? '#dc3545' : '#ccc'; // Rood of Grijs
-
-                // Edge eigenschappen bij Threat
+                const borderColor = isCrossSub ? '#dc3545' : '#ccc';
                 const edgeColor = isCrossSub ? '#dc3545' : '#848484';
-                const dashes = isCrossSub; // Gestreept bij threat
+                const dashes = isCrossSub;
 
-                // Voeg node toe als hij nog niet bestaat
                 if(!nodes.find(n => n.id === r.linked_asset_id)) {
-                    nodes.push({ 
-                        id: r.linked_asset_id, 
-                        label: r.name, 
-                        shape: 'image', 
-                        image: img,
-                        shapeProperties: { useBorderWithImage: true },
-                        borderWidth: borderWidth,
-                        color: { border: borderColor, background: '#fff' },
-                        x: nodePos.x, y: nodePos.y
-                    });
+                    nodes.push({ id: r.linked_asset_id, label: r.name, shape: 'image', image: img, shapeProperties: { useBorderWithImage: true }, borderWidth: borderWidth, color: { border: borderColor, background: '#fff' }, x: nodePos.x, y: nodePos.y });
                 }
-                
-                // Voeg edge toe
-                edges.push({ 
-                    from: currentAssetId, 
-                    to: r.linked_asset_id, 
-                    label: r.relation_type, 
-                    arrows: 'to',
-                    color: { color: edgeColor },
-                    dashes: dashes,
-                    width: isCrossSub ? 2 : 1
-                });
+                edges.push({ from: currentAssetId, to: r.linked_asset_id, label: r.relation_type, arrows: 'to', color: { color: edgeColor }, dashes: dashes, width: isCrossSub ? 2 : 1 });
             };
-
             currentRelationships.downstream.forEach(r => addLinkedNode(r, '#ffc107'));
             currentRelationships.upstream.forEach(r => addLinkedNode(r, '#198754'));
 
-            // Toon warning als er threats zijn
             const alertBox = document.getElementById('threatAlert');
-            if (threatFound) alertBox.classList.remove('d-none');
-            else alertBox.classList.add('d-none');
+            if (threatFound) alertBox.classList.remove('d-none'); else alertBox.classList.add('d-none');
 
             const container = document.getElementById('networkGraph');
             const data = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
-            
-            // Als we layout hebben, physics UIT zetten om stuiteren te voorkomen
             const hasLayout = currentLayout !== null;
-
-            const options = { 
-                physics: { 
-                    enabled: !hasLayout, // Alleen aan als we geen opgeslagen layout hebben
-                    stabilization: { iterations: 1000 }, 
-                    barnesHut: { gravitationalConstant: -3000 }
-                }, 
-                layout: { randomSeed: 2 }, 
-                interaction: { zoomView: true, dragView: true },
-                nodes: { borderWidth: 1, borderWidthSelected: 2 }
-            };
-            
+            const options = { physics: { enabled: !hasLayout, stabilization: { iterations: 1000 }, barnesHut: { gravitationalConstant: -3000 } }, layout: { randomSeed: 2 }, interaction: { zoomView: true, dragView: true }, nodes: { borderWidth: 1, borderWidthSelected: 2 } };
             networkInstance = new vis.Network(container, data, options);
+            if (!hasLayout) networkInstance.on("stabilizationIterationsDone", function () { networkInstance.setOptions( { physics: false } ); });
+            networkInstance.on("dragStart", function (params) { networkInstance.setOptions( { physics: false } ); });
+        }
+        function togglePhysics() { if(!networkInstance) return; const current = networkInstance.physics.physicsEnabled; networkInstance.setOptions({ physics: !current }); }
+        async function saveLayout() { if(!networkInstance) return; const positions = networkInstance.getPositions(); await fetch('/api/asset-details', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ type: 'layout', asset_id: currentAssetId, positions: positions }) }); alert(t('alert_saved')); currentLayout = positions; }
+        function exportNetworkImage() { if(!networkInstance) return; const canvas = document.querySelector('#networkGraph canvas'); const link = document.createElement('a'); link.download = `network_map_${currentAssetId}.png`; link.href = canvas.toDataURL(); link.click(); }
 
-            // Zodra gestabiliseerd, zet physics uit zodat je kunt slepen zonder terugveren
-            if (!hasLayout) {
-                networkInstance.on("stabilizationIterationsDone", function () {
-                    networkInstance.setOptions( { physics: false } );
-                });
-            }
-            
-            // Altijd physics uit bij slepen
-            networkInstance.on("dragStart", function (params) {
-                networkInstance.setOptions( { physics: false } );
+        // --- EXPORT ---
+        async function exportCSV() {
+            const res = await fetch('/api/assets?limit=all'); if(!res.ok) return alert('Fout'); const json = await res.json(); const data = json.data;
+            if(!data.length) return alert(t('txt_no_data'));
+            const headers = ["ID", "Naam", "Type", "IP Adressen", "Subscriptie", "Eigenaar", "CIS Score", "Classificatie", "Gevoeligheid", "Vuln Count"];
+            let csv = headers.join(",") + "\n";
+            data.forEach(a => {
+                const subObj = allSubs.find(s => s.guid === a.subscription_id); const subName = subObj ? subObj.name : a.subscription_id;
+                const ips = (a.ips && a.ips.length > 0) ? a.ips.join(";") : a.ip_address;
+                const row = [a.id, `"${a.name}"`, `"${a.type}"`, `"${ips}"`, `"${subName}"`, `"${a.owner_contact}"`, a.cis_score||0, a.classification, `"${(a.data_sensitivity||'').replace(/,/g,';')}"`, a.vuln_count];
+                csv += row.join(",") + "\n";
             });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `assets_export_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(link); link.click(); document.body.removeChild(link);
         }
 
-        async function saveLayout() {
-            if(!networkInstance) return;
-            // Haal posities op
-            const positions = networkInstance.getPositions();
-            // Stuur naar API
-            await fetch('/api/asset-details', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ type: 'layout', asset_id: currentAssetId, positions: positions })
-            });
-            alert("Layout opgeslagen!");
-            // Update lokale state zodat we bij volgende keer openen direct goed zitten
-            currentLayout = positions;
-        }
-
-        function togglePhysics() {
-            if(!networkInstance) return;
-            const current = networkInstance.physics.physicsEnabled;
-            networkInstance.setOptions({ physics: !current });
-            const btn = document.getElementById('physBtn');
-            btn.innerHTML = !current ? '<i class="bi bi-pause-fill"></i> Stop Organiseren' : '<i class="bi bi-play-fill"></i> Organiseren';
-        }
-
-        function exportNetworkImage() {
-            if(!networkInstance) return;
-            const canvas = document.querySelector('#networkGraph canvas');
-            const link = document.createElement('a'); link.download = `network_map_${currentAssetId}.png`; link.href = canvas.toDataURL(); link.click();
-        }
-
-        // --- DETAILS / RELATIES ---
+        // --- CRUD & DETAILS ---
         async function openDetailModal(id, name) {
             currentAssetId = id; document.getElementById('detailTitle').innerText = `Details voor: ${name}`;
             try {
                 const res = await fetch(`/api/asset-details?id=${id}`); const data = await res.json();
-                currentRelationships = data.relationships;
-                currentLayout = data.layout; // Layout laden
-
+                currentRelationships = data.relationships; currentLayout = data.layout;
                 const vT = document.getElementById('vulnTable'); vT.innerHTML=''; data.vulnerabilities.forEach(v => vT.innerHTML+=`<tr><td>${v.name}</td><td>${v.severity}</td><td>${v.status}</td><td>${v.due_date||'-'}</td><td><i class="bi bi-trash text-danger" onclick="deleteDetail('vuln',${v.id})"></i></td></tr>`);
                 const cT = document.getElementById('cisTable'); cT.innerHTML=''; data.cis.forEach(c => cT.innerHTML+=`<tr><td>${c.control_id}</td><td>${c.description}</td><td>${c.justification}</td><td><i class="bi bi-trash text-danger" onclick="deleteDetail('cis',${c.id})"></i></td></tr>`);
                 const hT = document.getElementById('histTable'); hT.innerHTML=''; data.history.forEach(h => hT.innerHTML+=`<tr><td>${new Date(h.timestamp).toLocaleString()}</td><td>${h.changed_by}</td><td>${h.change_type}</td></tr>`);
-                
                 await loadAssetDropdown();
                 const rdT = document.getElementById('relDownTable'); rdT.innerHTML = ''; data.relationships.downstream.forEach(r => rdT.innerHTML += `<tr><td>${r.relation_type} <span class="fw-bold">${r.name}</span></td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
                 const ruT = document.getElementById('relUpTable'); ruT.innerHTML = ''; data.relationships.upstream.forEach(r => ruT.innerHTML += `<tr><td><span class="fw-bold">${r.name}</span> ${r.relation_type} deze asset</td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
-                
                 new bootstrap.Modal(document.getElementById('detailModal')).show();
             } catch(e) { console.error(e); alert("Details fout"); }
         }
-
-        async function loadAssetDropdown() {
-            const res = await fetch('/api/asset-details?type=list'); const list = await res.json();
-            const sel = document.getElementById('rTarget'); sel.innerHTML = '<option value="">Selecteer asset...</option>';
-            list.forEach(item => { if(item.id !== currentAssetId) sel.innerHTML += `<option value="${item.id}">${item.name}</option>`; });
-        }
+        async function loadAssetDropdown() { const res = await fetch('/api/asset-details?type=list'); const list = await res.json(); const sel = document.getElementById('rTarget'); sel.innerHTML = '<option value="">...</option>'; list.forEach(item => { if(item.id !== currentAssetId) sel.innerHTML += `<option value="${item.id}">${item.name}</option>`; }); }
         async function addRel() { const targetId = document.getElementById('rTarget').value; const type = document.getElementById('rType').value; if(!targetId) return alert("Kies een asset"); await fetch('/api/asset-details', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ type: 'rel', parent_id: currentAssetId, child_id: targetId, relation_type: type }) }); const name = document.getElementById('detailTitle').innerText.replace('Details voor: ', ''); openDetailModal(currentAssetId, name); }
-        async function deleteDetail(type, id) { if(!confirm("Verwijderen?")) return; await fetch('/api/asset-details', { method: 'DELETE', body: JSON.stringify({type, id}) }); const name = document.getElementById('detailTitle').innerText.replace('Details voor: ', ''); openDetailModal(currentAssetId, name); if(type !== 'rel') loadAssets(currentPage); }
+        async function deleteDetail(type, id) { if(!confirm(t('alert_confirm'))) return; await fetch('/api/asset-details', { method: 'DELETE', body: JSON.stringify({type, id}) }); const name = document.getElementById('detailTitle').innerText.replace('Details voor: ', ''); openDetailModal(currentAssetId, name); if(type !== 'rel') loadAssets(currentPage); }
         async function addVuln() { const body = { type: 'vuln', asset_id: currentAssetId, name: document.getElementById('vName').value, severity: document.getElementById('vSev').value, status: document.getElementById('vStat').value, due_date: document.getElementById('vDate').value }; await fetch('/api/asset-details', { method: 'POST', body: JSON.stringify(body) }); document.getElementById('vulnForm').reset(); openDetailModal(currentAssetId, document.getElementById('detailTitle').innerText.replace('Details voor: ', '')); loadAssets(currentPage); }
         async function addCis() { const body = { type: 'cis', asset_id: currentAssetId, control_id: document.getElementById('cId').value, description: document.getElementById('cDesc').value, justification: document.getElementById('cJust').value }; await fetch('/api/asset-details', { method: 'POST', body: JSON.stringify(body) }); document.getElementById('cisForm').reset(); openDetailModal(currentAssetId, document.getElementById('detailTitle').innerText.replace('Details voor: ', '')); }
-
-        // --- ASSET CRUD / IMPORT ---
-        function openCreateModal() { document.getElementById('assetForm').reset(); document.getElementById('assetId').value = ''; document.getElementById('modalTitle').innerText='Nieuwe Asset'; new bootstrap.Modal(document.getElementById('assetModal')).show(); }
+        function openCreateModal() { document.getElementById('assetForm').reset(); document.getElementById('assetId').value = ''; document.getElementById('modalTitle').innerText=t('btn_new_asset'); new bootstrap.Modal(document.getElementById('assetModal')).show(); }
         function openEditModal(id) { const a = allAssets.find(x => x.id === id); document.getElementById('assetId').value=id; document.getElementById('name').value=a.name; document.getElementById('type').value=a.type; document.getElementById('cis').value=a.cis_score; document.getElementById('subSelect').value=a.subscription_id; document.getElementById('owner').value=a.owner_contact; document.getElementById('ip').value=(a.ips||[a.ip_address]).join(', '); document.getElementById('classif').value=a.classification; document.querySelectorAll('.sens-check').forEach(c => c.checked=(a.data_sensitivity||'').includes(c.value)); document.getElementById('modalTitle').innerText='Bewerken'; new bootstrap.Modal(document.getElementById('assetModal')).show(); }
         async function saveAsset() { const id = document.getElementById('assetId').value; const sens=[]; document.querySelectorAll('.sens-check:checked').forEach(c=>sens.push(c.value)); const body = { id:id?id:null, name:document.getElementById('name').value, type:document.getElementById('type').value, cis_score:document.getElementById('cis').value, subscription_id:document.getElementById('subSelect').value, owner_contact:document.getElementById('owner').value, ip_address:document.getElementById('ip').value, classification:document.getElementById('classif').value, data_sensitivity:sens }; const r = await fetch('/api/assets', {method:id?'PUT':'POST', body:JSON.stringify(body)}); if(r.ok) { bootstrap.Modal.getInstance(document.getElementById('assetModal')).hide(); loadAssets(currentPage); } else alert(await r.text()); }
-        async function deleteAsset(id) { if(confirm('Wissen?')) { await fetch('/api/assets', {method:'DELETE', body:JSON.stringify({id})}); loadAssets(currentPage); } }
+        async function deleteAsset(id) { if(confirm(t('alert_confirm'))) { await fetch('/api/assets', {method:'DELETE', body:JSON.stringify({id})}); loadAssets(currentPage); } }
         function openImportModal() { document.getElementById('importPreview').classList.add('d-none'); document.getElementById('csvFile').value=''; new bootstrap.Modal(document.getElementById('importModal')).show(); }
-        function analyzeCSV() { const file = document.getElementById('csvFile').files[0]; if(!file) return alert('Kies bestand'); const reader = new FileReader(); reader.onload=async(e)=>{ const rows=csvToJSON(e.target.result); if(!rows.length) return alert('Geen data'); const r=await fetch('/api/import-handler', {method:'POST', body:JSON.stringify({mode:'check', type:'assets', data:rows})}); const d=await r.json(); importData.new=d.new; document.getElementById('countNew').innerText=d.new.length; document.getElementById('listNew').innerHTML=d.new.map(i=>`<tr><td>${i.name}</td></tr>`).join(''); document.getElementById('importPreview').classList.remove('d-none'); document.getElementById('btnConfirmImport').disabled=!d.new.length; }; reader.readAsText(file); }
-        async function executeImport() { if(!confirm('Start?')) return; const r=await fetch('/api/import-handler', {method:'POST', body:JSON.stringify({mode:'execute', type:'assets', data:importData.new})}); if(r.ok) { alert('Klaar'); bootstrap.Modal.getInstance(document.getElementById('importModal')).hide(); loadAssets(currentPage); } }
+        function analyzeCSV() { const file = document.getElementById('csvFile').files[0]; if(!file) return alert('Kies bestand'); const reader = new FileReader(); reader.onload=async(e)=>{ const rows=csvToJSON(e.target.result); if(!rows.length) return alert(t('txt_no_data')); const r=await fetch('/api/import-handler', {method:'POST', body:JSON.stringify({mode:'check', type:'assets', data:rows})}); const d=await r.json(); importData.new=d.new; document.getElementById('countNew').innerText=d.new.length; document.getElementById('listNew').innerHTML=d.new.map(i=>`<tr><td>${i.name}</td></tr>`).join(''); document.getElementById('importPreview').classList.remove('d-none'); document.getElementById('btnConfirmImport').disabled=!d.new.length; }; reader.readAsText(file); }
+        async function executeImport() { if(!confirm(t('alert_confirm'))) return; const r=await fetch('/api/import-handler', {method:'POST', body:JSON.stringify({mode:'execute', type:'assets', data:importData.new})}); if(r.ok) { alert('Klaar'); bootstrap.Modal.getInstance(document.getElementById('importModal')).hide(); loadAssets(currentPage); } }
         function csvToJSON(csv) { const lines=csv.split(/\r?\n/); if(lines.length<1) return []; const h=lines[0].split(',').map(x=>x.trim().replace(/^"|"$/g,'').replace(/^\uFEFF/,'')); const res=[]; for(let i=1;i<lines.length;i++){ if(!lines[i].trim()) continue; const l=lines[i].split(','); const o={}; for(let j=0;j<h.length;j++) o[h[j]]=l[j]?l[j].trim().replace(/^"|"$/g,''):''; res.push(o); } return res; }
-        
-        function toggleGlobalReveal() {
-            isGlobalRevealed = !isGlobalRevealed;
-            const btn = document.getElementById('globalEyeBtn'); const icon = btn.querySelector('i');
-            if (isGlobalRevealed) { btn.className='btn btn-warning'; icon.className='bi bi-eye-slash'; } else { btn.className='btn btn-outline-secondary'; icon.className='bi bi-eye'; }
-            document.querySelectorAll('.masked-data').forEach(el => el.classList.toggle('revealed', isGlobalRevealed));
-        }
     </script>
 </body>
 </html>

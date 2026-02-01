@@ -7,6 +7,9 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .cursor-pointer { cursor: pointer; }
+    </style>
 </head>
 <body class="bg-light">
 
@@ -14,21 +17,30 @@
         <div class="container">
             <a class="navbar-brand" href="#"><i class="bi bi-shield-lock"></i> Security Center</a>
             <div class="d-flex gap-3 align-items-center">
-                <a class="nav-link text-white" href="/assets.html">Assets</a>
-                <a class="nav-link text-white" href="/subscriptions.html">Subscripties</a>
-                <a id="adminBtn" href="/admin.html" class="btn btn-danger btn-sm d-none">Admin</a>
+                <a class="nav-link text-white" href="/assets.html" data-i18n="nav_assets">Assets</a>
+                <a class="nav-link text-white" href="/subscriptions.html" data-i18n="nav_subs">Subscripties</a>
+                
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-translate"></i> <span id="currentLang">NL</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item cursor-pointer" onclick="setLanguage('nl')">🇳🇱 Nederlands</a></li>
+                        <li><a class="dropdown-item cursor-pointer" onclick="setLanguage('en')">🇬🇧 English</a></li>
+                    </ul>
+                </div>
+
                 <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#settingsModal"><i class="bi bi-gear-fill"></i></button>
-                <a href="/api/logout" class="btn btn-danger btn-sm">Uit</a>
+                <a href="/api/logout" class="btn btn-danger btn-sm" data-i18n="btn_logout">Uit</a>
             </div>
         </div>
     </nav>
 
     <div class="container mt-4">
-        
         <div class="row mb-4">
             <div class="col-12">
-                <h2 class="display-6">Security Dashboard</h2>
-                <p class="text-muted">Welkom terug, <span id="username" class="fw-bold">...</span>. Hier is de status van vandaag.</p>
+                <h2 class="display-6" data-i18n="dash_title">Security Dashboard</h2>
+                <p class="text-muted"><span data-i18n="dash_welcome">Welkom terug,</span> <span id="username" class="fw-bold">...</span>.</p>
             </div>
         </div>
 
@@ -36,7 +48,7 @@
             <div class="col-md-3">
                 <div class="card shadow-sm border-start border-4 border-primary h-100">
                     <div class="card-body">
-                        <h6 class="text-muted text-uppercase small">Totaal Assets</h6>
+                        <h6 class="text-muted text-uppercase small" data-i18n="kpi_total">Totaal Assets</h6>
                         <h2 class="display-4 fw-bold text-primary" id="kpiTotal">-</h2>
                     </div>
                 </div>
@@ -44,7 +56,7 @@
             <div class="col-md-3">
                 <div class="card shadow-sm border-start border-4 border-success h-100">
                     <div class="card-body">
-                        <h6 class="text-muted text-uppercase small">Avg CIS Score</h6>
+                        <h6 class="text-muted text-uppercase small" data-i18n="kpi_cis">Avg CIS Score</h6>
                         <h2 class="display-4 fw-bold text-success" id="kpiCis">-</h2>
                     </div>
                 </div>
@@ -52,7 +64,7 @@
             <div class="col-md-3">
                 <div class="card shadow-sm border-start border-4 border-danger h-100">
                     <div class="card-body">
-                        <h6 class="text-muted text-uppercase small">Critical Issues</h6>
+                        <h6 class="text-muted text-uppercase small" data-i18n="kpi_crit">Critical Issues</h6>
                         <h2 class="display-4 fw-bold text-danger" id="kpiCrit">-</h2>
                     </div>
                 </div>
@@ -60,7 +72,7 @@
             <div class="col-md-3">
                 <div class="card shadow-sm border-start border-4 border-warning h-100">
                     <div class="card-body">
-                        <h6 class="text-muted text-uppercase small">High Issues</h6>
+                        <h6 class="text-muted text-uppercase small" data-i18n="kpi_high">High Issues</h6>
                         <h2 class="display-4 fw-bold text-warning" id="kpiHigh">-</h2>
                     </div>
                 </div>
@@ -70,40 +82,35 @@
         <div class="row g-3">
             <div class="col-md-6">
                 <div class="card shadow-sm h-100">
-                    <div class="card-header bg-white">Data Classificatie Verdeling</div>
-                    <div class="card-body">
-                        <canvas id="classChart"></canvas>
-                    </div>
+                    <div class="card-header bg-white" data-i18n="chart_class">Data Classificatie Verdeling</div>
+                    <div class="card-body"><canvas id="classChart"></canvas></div>
                 </div>
             </div>
             <div class="col-md-6">
                 <div class="card shadow-sm h-100">
-                    <div class="card-header bg-white">Kwetsbaarheden per Severity</div>
-                    <div class="card-body">
-                        <canvas id="vulnChart"></canvas>
-                    </div>
+                    <div class="card-header bg-white" data-i18n="chart_vuln">Kwetsbaarheden per Severity</div>
+                    <div class="card-body"><canvas id="vulnChart"></canvas></div>
                 </div>
             </div>
         </div>
-
     </div>
 
     <div class="modal fade" id="settingsModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title">Instellingen</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-header"><h5 class="modal-title" data-i18n="settings_title">Instellingen</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body">
-                    <h6>Wachtwoord Wijzigen</h6>
-                    <div class="input-group mb-3"><input type="password" id="newPass" class="form-control" placeholder="Nieuw wachtwoord"><button class="btn btn-secondary" onclick="updatePass()">Opslaan</button></div>
+                    <h6 data-i18n="settings_pw">Wachtwoord Wijzigen</h6>
+                    <div class="input-group mb-3"><input type="password" id="newPass" class="form-control" placeholder="***"><button class="btn btn-secondary" onclick="updatePass()" data-i18n="btn_save">Opslaan</button></div>
                     <hr>
                     <h6>MFA Status: <span id="mfaStatus" class="badge bg-secondary">...</span></h6>
                     <div id="mfaControls" class="mt-2">
-                        <button id="startMfaBtn" class="btn btn-primary btn-sm w-100 d-none" onclick="startMfaSetup()">MFA Aanzetten</button>
-                        <button id="disableMfaBtn" class="btn btn-danger btn-sm w-100 d-none" onclick="disableMFA()">MFA Uitschakelen</button>
+                        <button id="startMfaBtn" class="btn btn-primary btn-sm w-100 d-none" onclick="startMfaSetup()" data-i18n="btn_mfa_on">MFA Aanzetten</button>
+                        <button id="disableMfaBtn" class="btn btn-danger btn-sm w-100 d-none" onclick="disableMFA()" data-i18n="btn_mfa_off">MFA Uitschakelen</button>
                     </div>
                     <div id="mfaSetup" class="d-none border p-3 mt-2">
                         <div id="qrcode" class="mb-2"></div>
-                        <input type="text" id="setupCode" class="form-control mb-2" placeholder="Code"><button class="btn btn-success w-100" onclick="confirmMFA()">Bevestigen</button>
+                        <input type="text" id="setupCode" class="form-control mb-2" placeholder="Code"><button class="btn btn-success w-100" onclick="confirmMFA()" data-i18n="btn_confirm">Bevestigen</button>
                         <input type="hidden" id="tempSecret">
                     </div>
                 </div>
@@ -114,13 +121,53 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script>
-        // 1. DATA LADEN
+        // --- VERTALINGEN ---
+        const translations = {
+            nl: {
+                nav_assets: "Assets", nav_subs: "Subscripties", btn_logout: "Uit",
+                dash_title: "Security Dashboard", dash_welcome: "Welkom terug,",
+                kpi_total: "Totaal Assets", kpi_cis: "Gem. CIS Score", kpi_crit: "Kritieke Issues", kpi_high: "Hoge Issues",
+                chart_class: "Data Classificatie Verdeling", chart_vuln: "Kwetsbaarheden per Ernst",
+                settings_title: "Instellingen", settings_pw: "Wachtwoord Wijzigen", btn_save: "Opslaan",
+                btn_mfa_on: "MFA Aanzetten", btn_mfa_off: "MFA Uitschakelen", btn_confirm: "Bevestigen",
+                mfa_active: "Actief", mfa_off: "Uit"
+            },
+            en: {
+                nav_assets: "Assets", nav_subs: "Subscriptions", btn_logout: "Logout",
+                dash_title: "Security Dashboard", dash_welcome: "Welcome back,",
+                kpi_total: "Total Assets", kpi_cis: "Avg CIS Score", kpi_crit: "Critical Issues", kpi_high: "High Issues",
+                chart_class: "Data Classification Distribution", chart_vuln: "Vulnerabilities by Severity",
+                settings_title: "Settings", settings_pw: "Change Password", btn_save: "Save",
+                btn_mfa_on: "Enable MFA", btn_mfa_off: "Disable MFA", btn_confirm: "Confirm",
+                mfa_active: "Active", mfa_off: "Off"
+            }
+        };
+
+        function setLanguage(lang) {
+            localStorage.setItem('lang', lang);
+            applyLanguage();
+        }
+
+        function applyLanguage() {
+            const lang = localStorage.getItem('lang') || 'nl';
+            document.getElementById('currentLang').innerText = lang.toUpperCase();
+            
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if(translations[lang][key]) el.innerText = translations[lang][key];
+            });
+            // Herlaad grafieken als data geladen is (om labels te vertalen)
+            if(window.lastStats) { renderClassChart(window.lastStats.classification_stats); renderVulnChart(window.lastStats.vuln_stats); }
+        }
+
+        // --- INIT ---
+        applyLanguage();
+
         fetch('/api/user').then(r => {
             if(r.status===401) window.location.href='/login.html';
             return r.json();
         }).then(u => {
             document.getElementById('username').innerText = u.username;
-            if(u.role === 'admin') document.getElementById('adminBtn').classList.remove('d-none');
             updateMfaUI(u.mfa_enabled);
             loadDashboardStats();
         });
@@ -129,93 +176,77 @@
             try {
                 const res = await fetch('/api/dashboard-stats');
                 const stats = await res.json();
+                window.lastStats = stats; // Opslaan voor vertaling refresh
 
-                // Vul KPI kaarten
                 document.getElementById('kpiTotal').innerText = stats.total_assets;
                 document.getElementById('kpiCis').innerText = stats.avg_cis + '%';
-
                 const crit = stats.vuln_stats.find(v => v.severity === 'Critical');
                 document.getElementById('kpiCrit').innerText = crit ? crit.count : 0;
-
                 const high = stats.vuln_stats.find(v => v.severity === 'High');
                 document.getElementById('kpiHigh').innerText = high ? high.count : 0;
 
-                // Render Grafieken
                 renderClassChart(stats.classification_stats);
                 renderVulnChart(stats.vuln_stats);
-
             } catch(e) { console.error("Stats fout", e); }
         }
 
+        // Grafieken (Nu met vertaling ondersteuning)
+        let chartInstance1 = null;
+        let chartInstance2 = null;
+
         function renderClassChart(data) {
+            const lang = localStorage.getItem('lang') || 'nl';
+            if(chartInstance1) chartInstance1.destroy();
             const ctx = document.getElementById('classChart').getContext('2d');
             const labels = data.map(d => d.classification);
             const counts = data.map(d => d.count);
-            
-            // Kleuren mapping
             const colors = labels.map(l => {
                 if(l==='Confidential') return '#dc3545';
                 if(l==='Internal') return '#ffc107';
                 return '#198754';
             });
 
-            new Chart(ctx, {
+            chartInstance1 = new Chart(ctx, {
                 type: 'doughnut',
-                data: {
-                    labels: labels,
-                    datasets: [{ data: counts, backgroundColor: colors }]
-                }
+                data: { labels: labels, datasets: [{ data: counts, backgroundColor: colors }] }
             });
         }
 
         function renderVulnChart(data) {
+            if(chartInstance2) chartInstance2.destroy();
             const ctx = document.getElementById('vulnChart').getContext('2d');
-            // Zorg voor vaste volgorde
             const order = ['Critical', 'High', 'Medium', 'Low'];
             const counts = order.map(sev => {
                 const found = data.find(d => d.severity === sev);
                 return found ? found.count : 0;
             });
 
-            new Chart(ctx, {
+            const lang = localStorage.getItem('lang') || 'nl';
+            const labelText = lang === 'en' ? 'Count' : 'Aantal';
+
+            chartInstance2 = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: order,
-                    datasets: [{ 
-                        label: 'Aantal',
-                        data: counts, 
-                        backgroundColor: ['#dc3545', '#fd7e14', '#ffc107', '#0d6efd'] 
-                    }]
+                    datasets: [{ label: labelText, data: counts, backgroundColor: ['#dc3545', '#fd7e14', '#ffc107', '#0d6efd'] }]
                 },
                 options: { scales: { y: { beginAtZero: true } } }
             });
         }
 
-        // --- MFA & SETTINGS FUNCTIES (zelfde als voorheen) ---
         function updateMfaUI(isOn) {
-            document.getElementById('mfaStatus').innerText = isOn ? "Actief" : "Uit";
+            const lang = localStorage.getItem('lang') || 'nl';
+            document.getElementById('mfaStatus').innerText = isOn ? translations[lang].mfa_active : translations[lang].mfa_off;
             document.getElementById('mfaStatus').className = isOn ? "badge bg-success" : "badge bg-warning text-dark";
             if(isOn) document.getElementById('disableMfaBtn').classList.remove('d-none');
             else document.getElementById('startMfaBtn').classList.remove('d-none');
         }
-        async function updatePass() {
-            const p = document.getElementById('newPass').value; if(!p) return;
-            await fetch('/api/user', {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({new_password:p})});
-            alert('Opgeslagen'); document.getElementById('newPass').value='';
-        }
-        async function startMfaSetup() {
-            const r = await fetch('/api/mfa-settings'); const d = await r.json();
-            document.getElementById('mfaSetup').classList.remove('d-none'); document.getElementById('mfaControls').classList.add('d-none');
-            document.getElementById('tempSecret').value = d.secret; document.getElementById('qrcode').innerHTML="";
-            new QRCode(document.getElementById("qrcode"), {text:d.otpauth_url, width:128, height:128});
-        }
-        async function confirmMFA() {
-            const r = await fetch('/api/mfa-settings', {method:'POST', body:JSON.stringify({secret:document.getElementById('tempSecret').value, token:document.getElementById('setupCode').value})});
-            if(r.ok) location.reload(); else alert('Fout');
-        }
-        async function disableMFA() {
-            if(confirm('Zeker weten?')) { await fetch('/api/mfa-settings', {method:'DELETE'}); location.reload(); }
-        }
+        
+        // Settings functies (ongewijzigd)
+        async function updatePass() { const p = document.getElementById('newPass').value; if(!p) return; await fetch('/api/user', {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({new_password:p})}); alert('Opgeslagen'); document.getElementById('newPass').value=''; }
+        async function startMfaSetup() { const r = await fetch('/api/mfa-settings'); const d = await r.json(); document.getElementById('mfaSetup').classList.remove('d-none'); document.getElementById('mfaControls').classList.add('d-none'); document.getElementById('tempSecret').value = d.secret; document.getElementById('qrcode').innerHTML=""; new QRCode(document.getElementById("qrcode"), {text:d.otpauth_url, width:128, height:128}); }
+        async function confirmMFA() { const r = await fetch('/api/mfa-settings', {method:'POST', body:JSON.stringify({secret:document.getElementById('tempSecret').value, token:document.getElementById('setupCode').value})}); if(r.ok) location.reload(); else alert('Fout'); }
+        async function disableMFA() { if(confirm('Zeker weten?')) { await fetch('/api/mfa-settings', {method:'DELETE'}); location.reload(); } }
     </script>
 </body>
 </html>
