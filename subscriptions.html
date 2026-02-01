@@ -24,7 +24,14 @@
 
         <div class="card shadow-sm">
             <table class="table table-hover mb-0 align-middle">
-                <thead class="table-light"><tr><th>Naam</th><th>GUID</th><th>Verantwoordelijken</th><th class="text-end">Actie</th></tr></thead>
+                <thead class="table-light">
+                    <tr>
+                        <th>Naam</th>
+                        <th>GUID</th>
+                        <th>Verantwoordelijken</th>
+                        <th class="text-end">Actie</th>
+                    </tr>
+                </thead>
                 <tbody id="subTable"><tr><td colspan="4" class="p-3 text-center">Laden...</td></tr></tbody>
             </table>
         </div>
@@ -90,10 +97,11 @@
             allSubs = await res.json();
             
             const tbody = document.getElementById('subTable');
+            // AANPASSING: Aparte kolommen voor Naam en GUID
             tbody.innerHTML = allSubs.map(s => `
                 <tr>
-                    <td><strong>${s.name}</strong></td>
-                    <td class="text-muted small">${s.guid}</td>
+                    <td class="fw-bold">${s.name}</td>
+                    <td class="font-monospace text-muted">${s.guid}</td>
                     <td>${s.responsibles || '-'}</td>
                     <td class="text-end">
                         <button class="btn btn-sm btn-outline-primary" onclick="openEdit(${s.id})"><i class="bi bi-pencil"></i></button>
@@ -170,7 +178,6 @@
 
                 if(rows.length === 0) { alert("Geen data gevonden."); return; }
                 
-                // Backend Check
                 const res = await fetch('/api/import-handler', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -209,17 +216,15 @@
             } else alert("Er ging iets mis.");
         }
 
-        // --- CSV PARSER (Robuust) ---
         function csvToJSON(csv) {
             const lines = csv.split(/\r?\n/);
             if(lines.length < 1) return [];
-            // Headers opschonen (BOM verwijderen, quotes weg)
             const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').replace(/^\uFEFF/, ''));
 
             const result = [];
             for(let i=1; i<lines.length; i++) {
                 if(!lines[i].trim()) continue;
-                const currentline = lines[i].split(','); // Simpele split, voldoende voor deze files
+                const currentline = lines[i].split(',');
                 const obj = {};
                 for(let j=0; j<headers.length; j++) {
                     const val = currentline[j] ? currentline[j].trim().replace(/^"|"$/g, '') : '';

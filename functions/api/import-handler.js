@@ -16,7 +16,7 @@ function hashIP(ip) {
     return createHash('sha256').update(ip).digest('hex');
 }
 
-// --- API ---
+// --- API LOGIC ---
 export async function onRequestPost(context) {
     if (!context.data.user) return new Response('Unauthorized', { status: 401 });
     
@@ -42,16 +42,16 @@ async function handleCheck(context, type, rows) {
         const existingMap = new Map(results.map(r => [r.guid, r]));
 
         for (const row of rows) {
-            // MAPPING: Jouw CSV headers -> Database velden
-            const guid = row.subscription_id || row.guid; // CSV: subscription_id
-            const name = row.subscription_name || row.name; // CSV: subscription_name
+            const guid = row.subscription_id || row.guid;
+            const name = row.subscription_name || row.name;
             const resp = row.responsibles || '';
 
-            if (!guid) continue; 
+            if (!guid) continue;
 
             const item = { name, guid, responsibles: resp };
 
             if (existingMap.has(guid)) {
+                item.old_name = existingMap.get(guid).name;
                 report.existing.push(item);
             } else {
                 report.new.push(item);
@@ -59,31 +59,33 @@ async function handleCheck(context, type, rows) {
         }
     } 
     else if (type === 'assets') {
-        // Haal bestaande op om te checken
         const { results } = await context.env.MY_DB.prepare("SELECT name, ip_hash FROM assets").all();
         const existingNames = new Set(results.map(r => r.name));
         const existingHashes = new Set(results.map(r => r.ip_hash));
 
         for (const row of rows) {
-            // MAPPING: Jouw CSV (resources.csv) -> Database velden
-            // CSV headers: name, privateIP, location, resourceGroup, subscriptionId
-            
-            const ip = row.privateIP || row.ip_address; 
+            const ip = row.privateIP || row.ip_address;
             const subId = row.subscriptionId || row.subscription_id;
-            
-            if (!row.name) continue; // Skip lege regels
+            const name = row.name;
+
+            if (!name) continue;
 
             const item = {
-                name: row.name,
+                name: name,
                 ip_address: ip,
                 subscription_id: subId,
-                resource_group: row.resourceGroup || '', // Extra info bewaren we niet in DB tenzij we kolom hebben, maar wel handig voor logica
-                type: 'Imported Resource' 
+                resource_group: row.resourceGroup || '',
+                location: row.location || '',
+                type: 'Virtual Machine' 
             };
+
+            if (name.toLowerCase().includes('nic')) item.type = 'Network Interface';
+            if (name.toLowerCase().includes('db')) item.type = 'SQL Database';
+            if (name.toLowerCase().includes('kv')) item.type = 'Key Vault';
 
             const ipHash = ip ? hashIP(ip) : null;
             
-            if (existingNames.has(item.name)) {
+            if (existingNames.has(name)) {
                 item.reason = "Naam bestaat al";
                 report.conflicts.push(item);
             } else if (ipHash && existingHashes.has(ipHash)) {
@@ -105,12 +107,14 @@ async function handleExecute(context, type, rows) {
     if (type === 'subscriptions') {
         const stmt = context.env.MY_DB.prepare("INSERT INTO subscriptions (name, guid, responsibles, created_at) VALUES (?, ?, ?, ?)");
         const batch = [];
-        
         for (const row of rows) {
              batch.push(stmt.bind(row.name, row.guid, row.responsibles || '', Date.now()));
         }
-        // D1 Batch limit is vaak 100, we doen het simpel:
-        for(const q of batch) await q.run(); 
+        const chunkSize = 50;
+        for (let i = 0; i < batch.length; i += chunkSize) {
+            const chunk = batch.slice(i, i + chunkSize);
+            await context.env.MY_DB.batch(chunk);
+        }
         count = batch.length;
     }
     else if (type === 'assets') {
@@ -122,22 +126,20 @@ async function handleExecute(context, type, rows) {
         for (const row of rows) {
             const ipHash = hashIP(row.ip_address);
             const encIp = encrypt(row.ip_address, key);
-            const encSub = encrypt(row.subscription_id, key); 
-            const owner = encrypt('Imported', key); 
-
-            // Probeer type te raden op basis van naam in CSV (bv '-nic' wijst op netwerk interface, vaak VM)
-            let assetType = 'Virtual Machine';
-            if(row.name && row.name.includes('db')) assetType = 'SQL Database';
+            const encSub = encrypt(row.subscription_id, key); // Sla GUID versleuteld op
+            
+            // AANPASSING: Owner is leeg bij import, tenzij specifiek in CSV (hier default leeg)
+            const owner = encrypt('', key); 
             
             await stmt.bind(
                 row.name, 
-                assetType, 
+                row.type || 'Imported Resource', 
                 encSub, 
                 encIp, 
                 ipHash, 
-                0, // CIS default
-                'Internal', // Class default
-                '', // Sens default
+                0, // Default CIS score
+                'Internal', // Default Classification
+                '', // Default Sensitivity
                 owner, 
                 Date.now()
             ).run();
