@@ -5,65 +5,92 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inloggen</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background-color: #f8f9fa; }
-        .login-card { max-width: 400px; width: 100%; }
-    </style>
+    <style>body { background-color: #f8f9fa; } .login-card { max-width: 400px; width: 100%; }</style>
 </head>
 <body class="d-flex align-items-center min-vh-100">
-
     <div class="container d-flex justify-content-center">
         <div class="card login-card shadow-sm border-0">
             <div class="card-body p-4">
-                <h3 class="card-title text-center mb-4">Welkom</h3>
-                
+                <h3 class="card-title text-center mb-4">Login</h3>
                 <div id="error-alert" class="alert alert-danger d-none" role="alert"></div>
 
                 <form id="loginForm">
                     <div class="mb-3">
-                        <label for="user" class="form-label">Gebruikersnaam</label>
-                        <input type="text" class="form-control" id="user" placeholder="Bijv. admin" required>
+                        <label class="form-label">Gebruikersnaam</label>
+                        <input type="text" class="form-control" id="user" required>
                     </div>
                     <div class="mb-3">
-                        <label for="pass" class="form-label">Wachtwoord</label>
-                        <input type="password" class="form-control" id="pass" placeholder="Je wachtwoord" required>
+                        <label class="form-label">Wachtwoord</label>
+                        <input type="password" class="form-control" id="pass" required>
                     </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Inloggen</button>
+                    <div class="d-grid"><button type="submit" class="btn btn-primary">Verder</button></div>
+                </form>
+
+                <form id="mfaForm" class="d-none">
+                    <div class="alert alert-info">Voer de code uit je authenticator app in.</div>
+                    <div class="mb-3">
+                        <label class="form-label">2FA Code</label>
+                        <input type="text" class="form-control text-center fs-4" id="mfaCode" maxlength="6" inputmode="numeric">
                     </div>
+                    <div class="d-grid"><button type="submit" class="btn btn-primary">Verifieer</button></div>
                 </form>
             </div>
         </div>
     </div>
 
     <script>
-        document.getElementById('loginForm').onsubmit = async (e) => {
+        const loginForm = document.getElementById('loginForm');
+        const mfaForm = document.getElementById('mfaForm');
+        const alertBox = document.getElementById('error-alert');
+
+        // Check URL of we teruggestuurd zijn omdat MFA nodig is
+        if(window.location.search.includes('mfa=needed')) {
+             loginForm.classList.add('d-none');
+             mfaForm.classList.remove('d-none');
+        }
+
+        loginForm.onsubmit = async (e) => {
             e.preventDefault();
-            const alertBox = document.getElementById('error-alert');
-            
-            // Reset alert
             alertBox.classList.add('d-none');
+            
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                body: JSON.stringify({
+                    username: document.getElementById('user').value,
+                    password: document.getElementById('pass').value
+                })
+            });
 
-            try {
-                const res = await fetch('/api/login', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        username: document.getElementById('user').value,
-                        password: document.getElementById('pass').value
-                    })
-                });
-
-                if (res.ok) {
-                    window.location.href = '/'; 
+            if (res.ok) {
+                const data = await res.json();
+                if (data.mfa_required) {
+                    // Stap 1 gelukt, maar MFA nodig -> Toon Stap 2
+                    loginForm.classList.add('d-none');
+                    mfaForm.classList.remove('d-none');
+                    document.getElementById('mfaCode').focus();
                 } else {
-                    alertBox.textContent = 'Gebruikersnaam of wachtwoord onjuist.';
-                    alertBox.classList.remove('d-none');
+                    // Geen MFA nodig -> Klaar
+                    window.location.href = '/';
                 }
-            } catch (err) {
-                alertBox.textContent = 'Er ging iets mis met de verbinding.';
+            } else {
+                alertBox.textContent = 'Foute gegevens';
                 alertBox.classList.remove('d-none');
             }
         };
+
+        mfaForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const res = await fetch('/api/mfa-verify-login', {
+                method: 'POST',
+                body: JSON.stringify({ token: document.getElementById('mfaCode').value })
+            });
+            
+            if(res.ok) window.location.href = '/';
+            else {
+                alertBox.textContent = 'Code onjuist!';
+                alertBox.classList.remove('d-none');
+            }
+        }
     </script>
 </body>
 </html>

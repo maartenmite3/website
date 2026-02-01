@@ -2,46 +2,38 @@ export async function onRequest(context) {
   const url = new URL(context.request.url);
   const path = url.pathname;
 
-  // 1. PUBLIEKE ROUTES (Iedereen mag hier komen)
-  // - De root login pagina
-  // - Het bestand login.html
-  // - De API om in te loggen (anders kun je nooit inloggen)
-  // - Bestanden met een punt (zoals plaatjes, css, js)
+  // 1. PUBLIEKE ROUTES
   if (
     path === '/login' || 
     path === '/login.html' || 
-    path === '/api/login' ||   // <--- BELANGRIJKE WIJZIGING: Alleen deze API is publiek
+    path === '/api/login' || 
+    path === '/api/mfa-verify-login' || // NIEUW: Hier checken we de code
     path.includes('.')
   ) {
     return context.next();
   }
 
-  // 2. VOOR AL HET ANDERE: Check sessie cookie
+  // 2. CHECK COOKIE
   const cookie = context.request.headers.get('Cookie');
   const sessionKey = cookie?.match(/session_id=([^;]+)/)?.[1];
 
-  if (!sessionKey) {
-    // Geen sessie? Redirect naar login
-    return Response.redirect(`${url.origin}/login.html`, 302);
-  }
+  if (!sessionKey) return Response.redirect(`${url.origin}/login.html`, 302);
 
-  // 3. Check in database of sessie geldig is
-  const session = await context.env.MY_DB.prepare('SELECT user_id FROM sessions WHERE id = ?').bind(sessionKey).first();
+  // 3. CHECK DATABASE & STATUS
+  const session = await context.env.MY_DB.prepare('SELECT * FROM sessions WHERE id = ?').bind(sessionKey).first();
   
   if (!session) {
-    // Sessie niet gevonden of verlopen? Redirect naar login en wis cookie
-    return new Response(null, {
-      status: 302,
-      headers: {
-        'Location': '/login.html',
-        'Set-Cookie': 'session_id=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT' 
-      }
-    });
+    // Sessie bestaat niet -> Wegwezen
+    return new Response(null, { status: 302, headers: { 'Location': '/login.html', 'Set-Cookie': 'session_id=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT' }});
   }
 
-  // 4. Sessie gevonden! Haal gebruiker op en stop in context
+  // NIEUW: Als de sessie wacht op MFA, en we zitten niet op een API, stuur terug naar login
+  if (session.status === 'pending_mfa') {
+     // We sturen een signaal dat de frontend kan oppikken om het 2e scherm te tonen
+     return Response.redirect(`${url.origin}/login.html?mfa=needed`, 302);
+  }
+
+  // 4. HAAL USER OP
   context.data.user = await context.env.MY_DB.prepare('SELECT * FROM users WHERE id = ?').bind(session.user_id).first();
-  
-  // Ga door naar de gevraagde pagina/api
   return context.next();
 }

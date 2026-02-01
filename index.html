@@ -139,5 +139,65 @@ async function updatePass() {
     }
 }
     </script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<h6><i class="bi bi-shield-lock"></i> Multi-Factor Authenticatie</h6>
+<p class="small text-muted mb-2">Status: <span id="mfaStatus" class="badge bg-secondary">Laden...</span></p>
+
+<div id="mfaSetup" class="d-none border p-3 rounded bg-light">
+    <p class="small">Scan deze code met Google Authenticator:</p>
+    <div id="qrcode" class="mb-3 d-flex justify-content-center"></div>
+    <input type="text" id="setupCode" class="form-control mb-2" placeholder="Vul 6-cijferige code in">
+    <button class="btn btn-success btn-sm w-100" onclick="confirmMFA()">Activeren</button>
+    <input type="hidden" id="tempSecret">
+</div>
+
+<button id="startMfaBtn" class="btn btn-outline-primary btn-sm w-100" onclick="startMfaSetup()">
+    MFA Configureren
+</button>
+
+<script>
+    // Bestaande code... (user ophalen etc)
+
+    async function startMfaSetup() {
+        const res = await fetch('/api/mfa-settings');
+        const data = await res.json();
+        
+        document.getElementById('mfaSetup').classList.remove('d-none');
+        document.getElementById('startMfaBtn').classList.add('d-none');
+        document.getElementById('tempSecret').value = data.secret;
+        
+        document.getElementById('qrcode').innerHTML = ""; // Clear
+        new QRCode(document.getElementById("qrcode"), {
+            text: data.otpauth_url,
+            width: 128,
+            height: 128
+        });
+    }
+
+    async function confirmMFA() {
+        const secret = document.getElementById('tempSecret').value;
+        const token = document.getElementById('setupCode').value;
+
+        const res = await fetch('/api/mfa-settings', {
+            method: 'POST',
+            body: JSON.stringify({ secret, token })
+        });
+
+        if (res.ok) {
+            alert('MFA is nu actief! De volgende keer moet je inloggen met een code.');
+            location.reload();
+        } else {
+            alert('Code onjuist, probeer het opnieuw.');
+        }
+    }
+</script>
+
+
+
+
+
+
 </body>
 </html>
