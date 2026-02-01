@@ -43,7 +43,7 @@
                 <p class="lead">Je bent succesvol ingelogd in de beveiligde omgeving.</p>
                 <hr>
                 <div class="alert alert-info">
-                    <i class="bi bi-info-circle"></i> Dit is een beveiligde indexpagina.
+                    <i class="bi bi-info-circle"></i> Dit is een beveiligde indexpagina. Sessies verlopen automatisch na 15 minuten inactiviteit.
                 </div>
             </div>
         </div>
@@ -69,7 +69,17 @@
                     <h6><i class="bi bi-shield-lock"></i> Multi-Factor Authenticatie</h6>
                     <p class="small text-muted mb-2">Status: <span id="mfaStatus" class="badge bg-secondary">Laden...</span></p>
 
-                    <div id="mfaSetup" class="d-none border p-3 rounded bg-light mb-2">
+                    <div id="mfaControls">
+                        <button id="startMfaBtn" class="btn btn-outline-primary btn-sm w-100 d-none" onclick="startMfaSetup()">
+                            MFA Configureren
+                        </button>
+                        
+                        <button id="disableMfaBtn" class="btn btn-outline-danger btn-sm w-100 d-none" onclick="disableMFA()">
+                            MFA Uitschakelen
+                        </button>
+                    </div>
+
+                    <div id="mfaSetup" class="d-none border p-3 rounded bg-light mt-2">
                         <p class="small fw-bold">Scan met Google Authenticator:</p>
                         <div id="qrcode" class="mb-3 d-flex justify-content-center bg-white p-2 border"></div>
                         
@@ -78,12 +88,13 @@
                             <input type="text" id="setupCode" class="form-control" placeholder="123456" maxlength="6" inputmode="numeric">
                             <button class="btn btn-success" onclick="confirmMFA()">Activeren</button>
                         </div>
+                        
                         <input type="hidden" id="tempSecret">
+                        
+                        <div class="text-center">
+                            <button class="btn btn-sm btn-link text-muted" onclick="cancelSetup()">Annuleren</button>
+                        </div>
                     </div>
-
-                    <button id="startMfaBtn" class="btn btn-outline-primary btn-sm w-100" onclick="startMfaSetup()">
-                        MFA Configureren / Resetten
-                    </button>
 
                 </div>
                 <div class="modal-footer">
@@ -96,21 +107,43 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // --- 1. GEGEVENS LADEN ---
+        // Haalt gebruikersnaam en MFA status op bij het laden van de pagina
         fetch('/api/user')
             .then(r => r.json())
             .then(user => {
                 document.getElementById('username').innerText = user.username;
-                
-                const mfaBadge = document.getElementById('mfaStatus');
-                if (user.mfa_enabled) {
-                    mfaBadge.innerText = "Actief";
-                    mfaBadge.className = "badge bg-success";
-                } else {
-                    mfaBadge.innerText = "Niet actief";
-                    mfaBadge.className = "badge bg-warning text-dark";
-                }
+                updateMfaUI(user.mfa_enabled);
             })
-            .catch(err => console.error("Kon user niet laden", err));
+            .catch(err => {
+                console.error("Kon user niet laden", err);
+                // Als user niet geladen kan worden (bijv. sessie timeout), refresh pagina zodat middleware ingrijpt
+                if(err.status === 401) location.reload();
+            });
+
+        // Functie om de juiste knoppen te tonen (Aan of Uit)
+        function updateMfaUI(isEnabled) {
+            const badge = document.getElementById('mfaStatus');
+            const startBtn = document.getElementById('startMfaBtn');
+            const disableBtn = document.getElementById('disableMfaBtn');
+            const setupBox = document.getElementById('mfaSetup');
+            const controlsBox = document.getElementById('mfaControls');
+
+            // Reset alles naar basis
+            startBtn.classList.add('d-none');
+            disableBtn.classList.add('d-none');
+            setupBox.classList.add('d-none');
+            controlsBox.classList.remove('d-none'); // Knoppen weer zichtbaar maken
+
+            if (isEnabled) {
+                badge.innerText = "Actief";
+                badge.className = "badge bg-success";
+                disableBtn.classList.remove('d-none'); // Toon "Uitschakelen"
+            } else {
+                badge.innerText = "Niet actief";
+                badge.className = "badge bg-warning text-dark";
+                startBtn.classList.remove('d-none'); // Toon "Configureren"
+            }
+        }
 
         // --- 2. WACHTWOORD UPDATEN ---
         async function updatePass() {
@@ -127,29 +160,30 @@
                 });
 
                 if (res.ok) {
-                    alert('Wachtwoord gewijzigd!');
+                    alert('Wachtwoord succesvol gewijzigd!');
                     passField.value = '';
                 } else {
-                    alert('Fout: ' + await res.text());
+                    const txt = await res.text();
+                    alert('Fout: ' + txt);
                 }
-            } catch (e) { alert('Verbindingsfout'); }
+            } catch (e) { alert('Verbindingsfout bij wachtwoord wijzigen.'); }
         }
 
         // --- 3. MFA SETUP STARTEN ---
         async function startMfaSetup() {
             try {
-                // Haal een nieuwe secret op van de server
+                // Haal secret en URL op van backend
                 const res = await fetch('/api/mfa-settings');
                 const data = await res.json();
                 
-                // Toon het setup vakje en verberg de startknop
+                // UI Wisselen: Knoppen weg, Setup box tonen
+                document.getElementById('mfaControls').classList.add('d-none');
                 document.getElementById('mfaSetup').classList.remove('d-none');
-                document.getElementById('startMfaBtn').classList.add('d-none');
                 
-                // Sla de secret tijdelijk op (onzichtbaar)
+                // Secret opslaan in hidden field
                 document.getElementById('tempSecret').value = data.secret;
                 
-                // Genereer de QR code
+                // QR Code renderen
                 document.getElementById('qrcode').innerHTML = "";
                 new QRCode(document.getElementById("qrcode"), {
                     text: data.otpauth_url,
@@ -162,7 +196,13 @@
             }
         }
 
-        // --- 4. MFA BEVESTIGEN ---
+        function cancelSetup() {
+            // UI terugzetten: Setup box weg, Knoppen terug
+            document.getElementById('mfaSetup').classList.add('d-none');
+            document.getElementById('mfaControls').classList.remove('d-none');
+        }
+
+        // --- 4. MFA BEVESTIGEN (ACTIVEREN) ---
         async function confirmMFA() {
             const secret = document.getElementById('tempSecret').value;
             const token = document.getElementById('setupCode').value;
@@ -178,11 +218,27 @@
 
                 if (res.ok) {
                     alert('Succes! MFA is nu ingeschakeld.');
-                    location.reload(); // Herlaad pagina om status te updaten
+                    location.reload(); // Herlaad om de nieuwe status te zien
                 } else {
                     alert('Code onjuist, probeer het opnieuw.');
                 }
-            } catch (e) { alert('Verbindingsfout'); }
+            } catch (e) { alert('Verbindingsfout.'); }
+        }
+
+        // --- 5. MFA UITSCHAKELEN (DELETE) ---
+        async function disableMFA() {
+            if(!confirm("Weet je zeker dat je 2FA wilt uitzetten? Je account is dan minder goed beveiligd.")) return;
+
+            try {
+                const res = await fetch('/api/mfa-settings', { method: 'DELETE' });
+                
+                if (res.ok) {
+                    alert('MFA is uitgeschakeld.');
+                    location.reload(); // Herlaad om de knoppen te resetten
+                } else {
+                    alert('Kon MFA niet uitschakelen.');
+                }
+            } catch (e) { alert('Verbindingsfout.'); }
         }
     </script>
 </body>

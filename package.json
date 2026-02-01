@@ -1,7 +1,8 @@
 {
-  "name": "website",
+  "name": "mijn-secure-site",
   "version": "1.0.0",
   "dependencies": {
-    "otpauth": "^9.1.4"
+    "otpauth": "^9.1.4",
+    "bcryptjs": "^2.4.3"
   }
 }
