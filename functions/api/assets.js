@@ -36,56 +36,76 @@ export async function onRequestGet(context) {
   if (!context.data.user) return new Response('Unauthorized', { status: 401 });
   const key = context.env.ENCRYPTION_KEY;
 
-  // History request?
   const url = new URL(context.request.url);
+  
+  // 1. Check voor History request (blijft hetzelfde)
   const historyId = url.searchParams.get('history');
   if (historyId) {
       const { results } = await context.env.MY_DB.prepare("SELECT * FROM asset_history WHERE asset_id = ? ORDER BY timestamp DESC").bind(historyId).all();
       return Response.json(results);
   }
 
-  // 1. Haal assets op
+  // 2. Haal parameters op voor Filter & Limit
+  const search = (url.searchParams.get('q') || '').toLowerCase();
+  const limitParam = url.searchParams.get('limit') || '25';
+  
+  // 3. Haal ALLES op (Database is snel genoeg voor 800-2000 rows)
+  // We moeten alles ophalen om te kunnen zoeken in versleutelde velden
   const assetsQuery = await context.env.MY_DB.prepare("SELECT * FROM assets ORDER BY created_at DESC").all();
   const assets = assetsQuery.results;
 
-  // 2. Haal alle IPs op
+  // Haal IPs op
   const ipsQuery = await context.env.MY_DB.prepare("SELECT * FROM asset_ips").all();
   const ipMap = {};
-  
-  // Groepeer IPs per asset
   ipsQuery.results.forEach(row => {
       if(!ipMap[row.asset_id]) ipMap[row.asset_id] = [];
       ipMap[row.asset_id].push(decrypt(row.ip_address, key));
   });
 
-  // 3. Combineer en decrypt
-  const decryptedResults = assets.map(asset => {
-      // Als er nog geen IPs in de subtabel staan (oude data), gebruik dan de kolom uit de hoofdtabel
-      let assetIps = ipMap[asset.id] || [];
+  // 4. Decrypt, Filter en Slice in memory (Server Side = Snel)
+  let processed = [];
+  
+  for (const asset of assets) {
+      // Decrypt eerst de velden
+      const assetIps = ipMap[asset.id] || [];
       const mainIp = decrypt(asset.ip_address, key);
-      
-      // Fallback: als asset_ips leeg is, maar hoofdtabel niet, voeg die toe aan de lijst
-      if(assetIps.length === 0 && mainIp) assetIps = [mainIp];
+      if(assetIps.length === 0 && mainIp) assetIps.push(mainIp);
 
-      return {
+      const subId = decrypt(asset.subscription_id, key);
+      const owner = decrypt(asset.owner_contact, key);
+
+      // Het object zoals het naar de frontend zou gaan
+      const item = {
           ...asset,
-          subscription_id: decrypt(asset.subscription_id, key),
-          ip_address: mainIp, // Blijft primary voor display
-          ips: assetIps,      // De volledige lijst
-          owner_contact: decrypt(asset.owner_contact, key)
+          subscription_id: subId,
+          ip_address: mainIp,
+          ips: assetIps,
+          owner_contact: owner
       };
-  });
 
-  return Response.json(decryptedResults);
+      // FILTER LOGICA: Als er een zoekterm is, check dan of die voorkomt
+      if (search) {
+          const searchString = `${item.name} ${item.ip_address} ${assetIps.join(' ')} ${item.subscription_id} ${item.owner_contact}`.toLowerCase();
+          if (!searchString.includes(search)) {
+              continue; // Skip dit item, past niet bij zoekopdracht
+          }
+      }
+
+      processed.push(item);
+  }
+
+  // 5. Apply Limit (Pagination)
+  // Als limit 'all' is, stuur alles, anders knip de array af
+  if (limitParam !== 'all') {
+      const limit = parseInt(limitParam);
+      processed = processed.slice(0, limit);
+  }
+
+  return Response.json(processed);
 }
 
-export async function onRequestPost(context) {
-  return handleSave(context, 'POST');
-}
-
-export async function onRequestPut(context) {
-  return handleSave(context, 'PUT');
-}
+export async function onRequestPost(context) { return handleSave(context, 'POST'); }
+export async function onRequestPut(context) { return handleSave(context, 'PUT'); }
 
 async function handleSave(context, method) {
   if (!context.data.user) return new Response('Unauthorized', { status: 401 });
@@ -93,35 +113,25 @@ async function handleSave(context, method) {
   const data = await context.request.json();
   const id = data.id;
 
-  // 1. Validatie: Splits IPs
-  // We verwachten "1.1.1.1, 2.2.2.2"
   const rawIps = data.ip_address ? data.ip_address.split(',').map(s => s.trim()).filter(s => s) : [];
-  if (rawIps.length === 0) rawIps.push(''); // Lege entry toestaan als placeholder? Of error? Laten we leeg toestaan.
+  if (rawIps.length === 0) rawIps.push('');
 
-  // 2. Check Uniekheid (Naam & IPs)
-  // Check Naam
+  // Check Uniekheid
   let query = "SELECT id FROM assets WHERE name = ?";
   let params = [data.name];
   if (method === 'PUT') { query += " AND id != ?"; params.push(id); }
-  
   const existingName = await context.env.MY_DB.prepare(query).bind(...params).first();
   if (existingName) return new Response('Naam bestaat al.', { status: 409 });
 
-  // Check IPs (Loop door alle opgegeven IPs)
   for (const ip of rawIps) {
       if(!ip) continue;
       const h = hashIP(ip);
-      // Check in hoofdtabel (legacy) en subtabel
-      // Let op: Bij PUT mag het IP wel bestaan als het bij DEZE asset hoort.
-      
-      // Check hoofdtabel (ip_hash column)
       let q1 = "SELECT id FROM assets WHERE ip_hash = ?";
       let p1 = [h];
       if (method === 'PUT') { q1 += " AND id != ?"; p1.push(id); }
       const conflict1 = await context.env.MY_DB.prepare(q1).bind(...p1).first();
-      if (conflict1) return new Response(`IP ${ip} is al in gebruik (hoofdtabel).`, { status: 409 });
+      if (conflict1) return new Response(`IP ${ip} is al in gebruik.`, { status: 409 });
 
-      // Check subtabel
       let q2 = "SELECT asset_id FROM asset_ips WHERE ip_hash = ?";
       let p2 = [h];
       if (method === 'PUT') { q2 += " AND asset_id != ?"; p2.push(id); }
@@ -129,17 +139,14 @@ async function handleSave(context, method) {
       if (conflict2) return new Response(`IP ${ip} is al in gebruik.`, { status: 409 });
   }
 
-  // 3. Voorbereiden data
-  const primaryIp = rawIps[0] || ''; // Eerste is 'hoofd' IP
+  const primaryIp = rawIps[0] || '';
   const primaryHash = hashIP(primaryIp);
   const encPrimaryIp = encrypt(primaryIp, key);
-  
   const encSub = encrypt(data.subscription_id, key);
   const encOwner = encrypt(data.owner_contact, key);
   const sensitivity = Array.isArray(data.data_sensitivity) ? data.data_sensitivity.join(', ') : data.data_sensitivity;
 
   let assetId = id;
-
   if (method === 'POST') {
       const res = await context.env.MY_DB.prepare(`
         INSERT INTO assets (name, type, subscription_id, ip_address, ip_hash, cis_score, classification, data_sensitivity, owner_contact, created_at)
@@ -148,22 +155,16 @@ async function handleSave(context, method) {
       assetId = res.id;
       await logHistory(context, assetId, 'CREATE', null, JSON.stringify(data));
   } else {
-      // Haal oude data op voor history
       const oldAsset = await context.env.MY_DB.prepare("SELECT * FROM assets WHERE id = ?").bind(id).first();
-      const readableOld = { ...oldAsset, ip_address: decrypt(oldAsset.ip_address, key) }; // Simpele versie
-      
+      const readableOld = { ...oldAsset, ip_address: decrypt(oldAsset.ip_address, key) };
       await context.env.MY_DB.prepare(`
         UPDATE assets SET name=?, type=?, subscription_id=?, ip_address=?, ip_hash=?, cis_score=?, classification=?, data_sensitivity=?, owner_contact=?
         WHERE id=?
       `).bind(data.name, data.type, encSub, encPrimaryIp, primaryHash, data.cis_score, data.classification, sensitivity, encOwner, id).run();
-      
       await logHistory(context, id, 'UPDATE', JSON.stringify(readableOld), JSON.stringify(data));
-      
-      // Verwijder oude IPs uit subtabel om schoon te beginnen (simpelste update strategie)
       await context.env.MY_DB.prepare("DELETE FROM asset_ips WHERE asset_id = ?").bind(id).run();
   }
 
-  // 4. Sla alle IPs op in asset_ips
   if (rawIps.length > 0) {
       const stmt = context.env.MY_DB.prepare("INSERT INTO asset_ips (asset_id, ip_address, ip_hash) VALUES (?, ?, ?)");
       const batch = [];
@@ -181,7 +182,7 @@ export async function onRequestDelete(context) {
     if (!context.data.user) return new Response('Unauthorized', { status: 401 });
     const { id } = await context.request.json();
     await context.env.MY_DB.prepare("DELETE FROM assets WHERE id = ?").bind(id).run();
-    await context.env.MY_DB.prepare("DELETE FROM asset_ips WHERE asset_id = ?").bind(id).run(); // Ook IPs weg
+    await context.env.MY_DB.prepare("DELETE FROM asset_ips WHERE asset_id = ?").bind(id).run();
     await context.env.MY_DB.prepare("DELETE FROM asset_history WHERE asset_id = ?").bind(id).run();
     await context.env.MY_DB.prepare("DELETE FROM vulnerabilities WHERE asset_id = ?").bind(id).run();
     await context.env.MY_DB.prepare("DELETE FROM cis_exceptions WHERE asset_id = ?").bind(id).run();
@@ -190,7 +191,5 @@ export async function onRequestDelete(context) {
 
 async function logHistory(context, assetId, type, oldVal, newVal) {
     const user = context.data.user.username;
-    await context.env.MY_DB.prepare(
-        "INSERT INTO asset_history (asset_id, changed_by, change_type, old_values, new_values, timestamp) VALUES (?, ?, ?, ?, ?, ?)"
-    ).bind(assetId, user, type, oldVal, newVal, Date.now()).run();
+    await context.env.MY_DB.prepare("INSERT INTO asset_history (asset_id, changed_by, change_type, old_values, new_values, timestamp) VALUES (?, ?, ?, ?, ?, ?)").bind(assetId, user, type, oldVal, newVal, Date.now()).run();
 }

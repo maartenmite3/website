@@ -34,11 +34,19 @@
                 <button class="btn btn-success ms-2" onclick="openImportModal()"><i class="bi bi-file-earmark-spreadsheet"></i> Import CSV</button>
             </div>
             
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 align-items-center">
+                <select id="limitSelect" class="form-select" style="width:auto;" onchange="changeLimit()">
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                    <option value="200">200</option>
+                    <option value="all">Alles</option>
+                </select>
+
                 <button class="btn btn-outline-secondary" onclick="toggleGlobalReveal()" id="globalEyeBtn" title="Toon/Verberg alle gevoelige data">
                     <i class="bi bi-eye"></i>
                 </button>
-                <input type="text" id="searchBar" class="form-control" placeholder="Zoeken..." onkeyup="filterTable()">
+                <input type="text" id="searchBar" class="form-control" placeholder="Zoek op alles..." oninput="handleSearch()">
             </div>
         </div>
 
@@ -86,7 +94,7 @@
                                 <label class="text-danger">IP Adres(sen)</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="bi bi-hdd-network"></i></span>
-                                    <input type="text" id="ip" class="form-control" placeholder="10.0.0.1, 192.168.1.5 (Komma gescheiden)">
+                                    <input type="text" id="ip" class="form-control" placeholder="10.0.0.1, 192.168.1.5">
                                 </div>
                                 <div class="form-text">Meerdere IP's scheiden met een komma.</div>
                             </div>
@@ -181,7 +189,9 @@
         let currentAssetId = null;
         let isGlobalRevealed = false;
         let importData = { new: [] };
+        let searchTimeout = null; // Voor debounce
 
+        // START
         loadSubs();
 
         function toggleGlobalReveal() {
@@ -208,21 +218,50 @@
                 const sel = document.getElementById('subSelect');
                 sel.innerHTML = '<option value="">Kies...</option>';
                 allSubs.forEach(s => sel.innerHTML += `<option value="${s.guid}">${s.name} (${s.guid})</option>`);
-                loadAssets();
+                loadAssets(); // Start laden
             }
         }
 
+        // AANGEPAST: Laad Assets nu via Server-Side Search/Limit
         async function loadAssets() {
-            const res = await fetch('/api/assets');
+            const limit = document.getElementById('limitSelect').value;
+            const query = document.getElementById('searchBar').value;
+            
+            // Bouw URL met parameters
+            let url = `/api/assets?limit=${limit}`;
+            if(query) url += `&q=${encodeURIComponent(query)}`;
+
+            const tbody = document.getElementById('assetTable');
+            tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center">Laden...</td></tr>';
+
+            const res = await fetch(url);
             if(res.status === 401) return window.location.href = '/login.html';
-            allAssets = await res.json();
+            
+            allAssets = await res.json(); // Dit is nu de beperkte set (bv. 25 items)
             renderTable(allAssets);
+        }
+
+        // DEBOUNCE SEARCH: Wacht 300ms na typen voordat we server bellen
+        function handleSearch() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                loadAssets();
+            }, 300);
+        }
+
+        function changeLimit() {
+            loadAssets();
         }
 
         function renderTable(data) {
             const tbody = document.getElementById('assetTable');
             tbody.innerHTML = '';
             
+            if(data.length === 0) {
+                 tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-muted">Geen resultaten.</td></tr>';
+                 return;
+            }
+
             data.forEach(a => {
                 let rowClass = 'public';
                 if(a.classification === 'Internal') rowClass = 'internal';
@@ -236,8 +275,7 @@
                 const subObj = allSubs.find(s => s.guid === a.subscription_id);
                 const subDisplay = subObj ? subObj.name : a.subscription_id;
 
-                // IP Display: Toon eerste, en badge indien meerdere
-                const ips = a.ips || []; // Array van IPs
+                const ips = a.ips || [];
                 const primaryIp = ips[0] || a.ip_address || '';
                 let ipDisplay = primaryIp;
                 if(ips.length > 1) {
@@ -321,6 +359,8 @@
         function openCreateModal() { document.getElementById('assetForm').reset(); document.getElementById('assetId').value = ''; document.getElementById('modalTitle').innerText = 'Nieuwe Asset'; new bootstrap.Modal(document.getElementById('assetModal')).show(); }
         
         function openEditModal(id) {
+            // Let op: 'allAssets' bevat nu alleen de huidige pagina. Als je iets edit wat niet op de pagina staat (via search), werkt dit. 
+            // Maar 'edit' knop is alleen zichtbaar in de tabel, dus item zit in allAssets.
             const asset = allAssets.find(a => a.id === id);
             document.getElementById('assetId').value = id;
             document.getElementById('name').value = asset.name;
@@ -328,10 +368,8 @@
             document.getElementById('cis').value = asset.cis_score;
             document.getElementById('subSelect').value = asset.subscription_id; 
             document.getElementById('owner').value = asset.owner_contact;
-            // JOIN IPS:
             const ipList = asset.ips || [asset.ip_address];
             document.getElementById('ip').value = ipList.join(', ');
-            
             document.getElementById('classif').value = asset.classification;
             document.querySelectorAll('.sens-check').forEach(c => c.checked = (asset.data_sensitivity || '').includes(c.value));
             document.getElementById('modalTitle').innerText = 'Asset Bewerken';
@@ -347,7 +385,9 @@
         }
 
         async function deleteAsset(id) { if(confirm("Verwijderen?")) { await fetch('/api/assets', { method: 'DELETE', body: JSON.stringify({id}) }); loadAssets(); } }
-        function filterTable() { const term = document.getElementById('searchBar').value.toLowerCase(); const filtered = allAssets.filter(a => a.name.toLowerCase().includes(term) || (a.ips && a.ips.join(', ').includes(term)) || (a.ip_address && a.ip_address.includes(term))); renderTable(filtered); }
+        
+        // OUDE Filter functie is WEG, nu via Server Search
+        // function filterTable() { ... } 
     </script>
 </body>
 </html>
