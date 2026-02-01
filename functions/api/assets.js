@@ -35,22 +35,21 @@ function hashIP(ip) {
 export async function onRequestGet(context) {
   if (!context.data.user) return new Response('Unauthorized', { status: 401 });
   const key = context.env.ENCRYPTION_KEY;
-
   const url = new URL(context.request.url);
   
-  // 1. Check voor History request (blijft hetzelfde)
+  // 1. History request (Blijft array returnen, wordt apart behandeld in frontend)
   const historyId = url.searchParams.get('history');
   if (historyId) {
       const { results } = await context.env.MY_DB.prepare("SELECT * FROM asset_history WHERE asset_id = ? ORDER BY timestamp DESC").bind(historyId).all();
       return Response.json(results);
   }
 
-  // 2. Haal parameters op voor Filter & Limit
+  // 2. Parameters voor Pagination & Search
   const search = (url.searchParams.get('q') || '').toLowerCase();
   const limitParam = url.searchParams.get('limit') || '25';
+  const pageParam = parseInt(url.searchParams.get('page') || '1');
   
-  // 3. Haal ALLES op (Database is snel genoeg voor 800-2000 rows)
-  // We moeten alles ophalen om te kunnen zoeken in versleutelde velden
+  // 3. Haal ALLES op (Nodig voor decryptie & search)
   const assetsQuery = await context.env.MY_DB.prepare("SELECT * FROM assets ORDER BY created_at DESC").all();
   const assets = assetsQuery.results;
 
@@ -62,11 +61,10 @@ export async function onRequestGet(context) {
       ipMap[row.asset_id].push(decrypt(row.ip_address, key));
   });
 
-  // 4. Decrypt, Filter en Slice in memory (Server Side = Snel)
+  // 4. Decrypt & Filter (In Memory)
   let processed = [];
   
   for (const asset of assets) {
-      // Decrypt eerst de velden
       const assetIps = ipMap[asset.id] || [];
       const mainIp = decrypt(asset.ip_address, key);
       if(assetIps.length === 0 && mainIp) assetIps.push(mainIp);
@@ -74,7 +72,6 @@ export async function onRequestGet(context) {
       const subId = decrypt(asset.subscription_id, key);
       const owner = decrypt(asset.owner_contact, key);
 
-      // Het object zoals het naar de frontend zou gaan
       const item = {
           ...asset,
           subscription_id: subId,
@@ -83,25 +80,42 @@ export async function onRequestGet(context) {
           owner_contact: owner
       };
 
-      // FILTER LOGICA: Als er een zoekterm is, check dan of die voorkomt
       if (search) {
           const searchString = `${item.name} ${item.ip_address} ${assetIps.join(' ')} ${item.subscription_id} ${item.owner_contact}`.toLowerCase();
-          if (!searchString.includes(search)) {
-              continue; // Skip dit item, past niet bij zoekopdracht
-          }
+          if (!searchString.includes(search)) continue;
       }
 
       processed.push(item);
   }
 
-  // 5. Apply Limit (Pagination)
-  // Als limit 'all' is, stuur alles, anders knip de array af
+  // 5. Paginatie Logica
+  const totalItems = processed.length;
+  let pagedData = processed;
+  let totalPages = 1;
+
   if (limitParam !== 'all') {
       const limit = parseInt(limitParam);
-      processed = processed.slice(0, limit);
+      totalPages = Math.ceil(totalItems / limit);
+      
+      // Zorg dat we niet een pagina opvragen die niet bestaat
+      const currentPage = Math.min(Math.max(1, pageParam), totalPages || 1);
+      
+      const startIndex = (currentPage - 1) * limit;
+      const endIndex = startIndex + limit;
+      
+      pagedData = processed.slice(startIndex, endIndex);
   }
 
-  return Response.json(processed);
+  // 6. Return Data + Metadata
+  return Response.json({
+      data: pagedData,
+      meta: {
+          total: totalItems,
+          page: pageParam,
+          pages: totalPages,
+          limit: limitParam
+      }
+  });
 }
 
 export async function onRequestPost(context) { return handleSave(context, 'POST'); }
@@ -116,7 +130,6 @@ async function handleSave(context, method) {
   const rawIps = data.ip_address ? data.ip_address.split(',').map(s => s.trim()).filter(s => s) : [];
   if (rawIps.length === 0) rawIps.push('');
 
-  // Check Uniekheid
   let query = "SELECT id FROM assets WHERE name = ?";
   let params = [data.name];
   if (method === 'PUT') { query += " AND id != ?"; params.push(id); }
@@ -126,17 +139,15 @@ async function handleSave(context, method) {
   for (const ip of rawIps) {
       if(!ip) continue;
       const h = hashIP(ip);
-      let q1 = "SELECT id FROM assets WHERE ip_hash = ?";
-      let p1 = [h];
+      let q1 = "SELECT id FROM assets WHERE ip_hash = ?"; let p1 = [h];
       if (method === 'PUT') { q1 += " AND id != ?"; p1.push(id); }
-      const conflict1 = await context.env.MY_DB.prepare(q1).bind(...p1).first();
-      if (conflict1) return new Response(`IP ${ip} is al in gebruik.`, { status: 409 });
+      const c1 = await context.env.MY_DB.prepare(q1).bind(...p1).first();
+      if (c1) return new Response(`IP ${ip} is al in gebruik.`, { status: 409 });
 
-      let q2 = "SELECT asset_id FROM asset_ips WHERE ip_hash = ?";
-      let p2 = [h];
+      let q2 = "SELECT asset_id FROM asset_ips WHERE ip_hash = ?"; let p2 = [h];
       if (method === 'PUT') { q2 += " AND asset_id != ?"; p2.push(id); }
-      const conflict2 = await context.env.MY_DB.prepare(q2).bind(...p2).first();
-      if (conflict2) return new Response(`IP ${ip} is al in gebruik.`, { status: 409 });
+      const c2 = await context.env.MY_DB.prepare(q2).bind(...p2).first();
+      if (c2) return new Response(`IP ${ip} is al in gebruik.`, { status: 409 });
   }
 
   const primaryIp = rawIps[0] || '';
@@ -148,19 +159,13 @@ async function handleSave(context, method) {
 
   let assetId = id;
   if (method === 'POST') {
-      const res = await context.env.MY_DB.prepare(`
-        INSERT INTO assets (name, type, subscription_id, ip_address, ip_hash, cis_score, classification, data_sensitivity, owner_contact, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
-      `).bind(data.name, data.type, encSub, encPrimaryIp, primaryHash, data.cis_score, data.classification, sensitivity, encOwner, Date.now()).first();
+      const res = await context.env.MY_DB.prepare(`INSERT INTO assets (name, type, subscription_id, ip_address, ip_hash, cis_score, classification, data_sensitivity, owner_contact, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`).bind(data.name, data.type, encSub, encPrimaryIp, primaryHash, data.cis_score, data.classification, sensitivity, encOwner, Date.now()).first();
       assetId = res.id;
       await logHistory(context, assetId, 'CREATE', null, JSON.stringify(data));
   } else {
       const oldAsset = await context.env.MY_DB.prepare("SELECT * FROM assets WHERE id = ?").bind(id).first();
       const readableOld = { ...oldAsset, ip_address: decrypt(oldAsset.ip_address, key) };
-      await context.env.MY_DB.prepare(`
-        UPDATE assets SET name=?, type=?, subscription_id=?, ip_address=?, ip_hash=?, cis_score=?, classification=?, data_sensitivity=?, owner_contact=?
-        WHERE id=?
-      `).bind(data.name, data.type, encSub, encPrimaryIp, primaryHash, data.cis_score, data.classification, sensitivity, encOwner, id).run();
+      await context.env.MY_DB.prepare(`UPDATE assets SET name=?, type=?, subscription_id=?, ip_address=?, ip_hash=?, cis_score=?, classification=?, data_sensitivity=?, owner_contact=? WHERE id=?`).bind(data.name, data.type, encSub, encPrimaryIp, primaryHash, data.cis_score, data.classification, sensitivity, encOwner, id).run();
       await logHistory(context, id, 'UPDATE', JSON.stringify(readableOld), JSON.stringify(data));
       await context.env.MY_DB.prepare("DELETE FROM asset_ips WHERE asset_id = ?").bind(id).run();
   }
@@ -168,10 +173,7 @@ async function handleSave(context, method) {
   if (rawIps.length > 0) {
       const stmt = context.env.MY_DB.prepare("INSERT INTO asset_ips (asset_id, ip_address, ip_hash) VALUES (?, ?, ?)");
       const batch = [];
-      for (const ip of rawIps) {
-          if(!ip) continue;
-          batch.push(stmt.bind(assetId, encrypt(ip, key), hashIP(ip)));
-      }
+      for (const ip of rawIps) { if(!ip) continue; batch.push(stmt.bind(assetId, encrypt(ip, key), hashIP(ip))); }
       if(batch.length > 0) await context.env.MY_DB.batch(batch);
   }
 
@@ -186,6 +188,7 @@ export async function onRequestDelete(context) {
     await context.env.MY_DB.prepare("DELETE FROM asset_history WHERE asset_id = ?").bind(id).run();
     await context.env.MY_DB.prepare("DELETE FROM vulnerabilities WHERE asset_id = ?").bind(id).run();
     await context.env.MY_DB.prepare("DELETE FROM cis_exceptions WHERE asset_id = ?").bind(id).run();
+    await context.env.MY_DB.prepare("DELETE FROM asset_relationships WHERE parent_id = ? OR child_id = ?").bind(id, id).run();
     return new Response('Verwijderd');
 }
 
