@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <title>Audit Log - Security Center</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        .diff-added { color: green; background-color: #e6ffec; }
+        .diff-removed { color: red; background-color: #ffebe6; text-decoration: line-through; }
+        .cursor-pointer { cursor: pointer; }
+    </style>
+</head>
+<body class="bg-light">
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+        <div class="container">
+            <span class="navbar-brand"><i class="bi bi-shield-lock"></i> Security Center</span>
+            <div class="d-flex gap-3 align-items-center">
+                <a class="nav-link text-white" href="/assets.html" data-i18n="nav_assets">Assets</a>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-translate"></i> <span id="currentLang">NL</span></button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item cursor-pointer" onclick="setLanguage('nl')">🇳🇱 Nederlands</a></li>
+                        <li><a class="dropdown-item cursor-pointer" onclick="setLanguage('en')">🇬🇧 English</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 data-i18n="title_audit">Global Audit Log</h3>
+            <button class="btn btn-outline-secondary btn-sm" onclick="loadAuditLog()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th data-i18n="th_time">Tijdstip</th>
+                            <th data-i18n="th_user">Gebruiker</th>
+                            <th data-i18n="th_action">Actie</th>
+                            <th data-i18n="th_asset">Asset</th>
+                            <th class="text-end" data-i18n="th_details">Details</th>
+                        </tr>
+                    </thead>
+                    <tbody id="auditTable"><tr><td colspan="5" class="p-4 text-center" data-i18n="loading">Laden...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <nav aria-label="Page navigation"><ul class="pagination justify-content-center mt-3" id="paginationControls"></ul></nav>
+    </div>
+
+    <div class="modal fade" id="auditModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" data-i18n="modal_change">Wijziging Details</h5>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="diffViewer" class="font-monospace small bg-light p-3 border rounded" style="white-space: pre-wrap;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="btn_close">Sluiten</button>
+                    <button type="button" class="btn btn-warning d-none" id="btnRestore" onclick="restoreState()" data-i18n="btn_restore">↩️ Herstel naar OUD</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const translations = {
+            nl: {
+                nav_assets: "Terug naar Assets", title_audit: "Global Audit Log",
+                th_time: "Tijdstip", th_user: "Gebruiker", th_action: "Actie", th_asset: "Asset", th_details: "Details",
+                loading: "Laden...", modal_change: "Wijziging Details", btn_close: "Sluiten", btn_restore: "↩️ Herstel status",
+                txt_no_data: "Geen logs gevonden.", alert_restored: "Asset succesvol hersteld!", alert_error: "Fout bij herstel."
+            },
+            en: {
+                nav_assets: "Back to Assets", title_audit: "Global Audit Log",
+                th_time: "Timestamp", th_user: "User", th_action: "Action", th_asset: "Asset", th_details: "Details",
+                loading: "Loading...", modal_change: "Change Details", btn_close: "Close", btn_restore: "↩️ Restore State",
+                txt_no_data: "No logs found.", alert_restored: "Asset restored successfully!", alert_error: "Error restoring asset."
+            }
+        };
+
+        function setLanguage(lang) { localStorage.setItem('lang', lang); applyLanguage(); }
+        function applyLanguage() {
+            const lang = localStorage.getItem('lang') || 'nl';
+            document.getElementById('currentLang').innerText = lang.toUpperCase();
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if(translations[lang][key]) el.innerText = translations[lang][key];
+            });
+        }
+        function t(key) { const lang = localStorage.getItem('lang') || 'nl'; return translations[lang][key] || key; }
+
+        // --- LOGIC ---
+        let logs = [];
+        let currentPage = 1;
+        let selectedLogId = null;
+
+        applyLanguage();
+        loadAuditLog();
+
+        async function loadAuditLog(page = 1) {
+            currentPage = page;
+            const tbody = document.getElementById('auditTable');
+            tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center">${t('loading')}</td></tr>`;
+
+            try {
+                const res = await fetch(`/api/audit?page=${page}`);
+                const json = await res.json();
+                logs = json.data;
+                renderTable(json.data, json.meta);
+            } catch(e) { console.error(e); }
+        }
+
+        function renderTable(data, meta) {
+            const tbody = document.getElementById('auditTable'); tbody.innerHTML = '';
+            if(!data.length) return tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center">${t('txt_no_data')}</td></tr>`;
+
+            data.forEach(l => {
+                const date = new Date(l.timestamp).toLocaleString();
+                
+                let badge = 'bg-secondary';
+                if(l.change_type === 'CREATE') badge = 'bg-success';
+                if(l.change_type === 'UPDATE') badge = 'bg-primary';
+                if(l.change_type === 'DELETE') badge = 'bg-danger';
+                if(l.change_type === 'RESTORE') badge = 'bg-warning text-dark';
+
+                // Asset naam bepalen (uit de join, of uit de JSON als fallback)
+                let assetDisplay = l.current_name;
+                if(!assetDisplay && l.old_values) {
+                    try { const old = JSON.parse(l.old_values); assetDisplay = `${old.name} (Deleted)`; } catch(e){}
+                }
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${date}</td>
+                        <td>${l.changed_by}</td>
+                        <td><span class="badge ${badge}">${l.change_type}</span></td>
+                        <td class="fw-bold">${assetDisplay || 'Unknown'}</td>
+                        <td class="text-end"><button class="btn btn-sm btn-outline-dark" onclick="openDetails(${l.id})"><i class="bi bi-eye"></i></button></td>
+                    </tr>
+                `;
+            });
+            renderPagination(meta);
+        }
+
+        function openDetails(id) {
+            selectedLogId = id;
+            const log = logs.find(l => l.id === id);
+            const container = document.getElementById('diffViewer');
+            const btn = document.getElementById('btnRestore');
+            
+            let oldObj = log.old_values ? JSON.parse(log.old_values) : {};
+            let newObj = log.new_values ? JSON.parse(log.new_values) : {};
+            
+            // Bouw een simpele diff weergave
+            let html = "";
+            const allKeys = new Set([...Object.keys(oldObj), ...Object.keys(newObj)]);
+            
+            allKeys.forEach(key => {
+                const valOld = oldObj[key];
+                const valNew = newObj[key];
+                if(JSON.stringify(valOld) !== JSON.stringify(valNew)) {
+                    html += `<strong>${key}:</strong>\n`;
+                    if(valOld !== undefined) html += `<span class="diff-removed">- ${valOld}</span>\n`;
+                    if(valNew !== undefined) html += `<span class="diff-added">+ ${valNew}</span>\n`;
+                    html += "\n";
+                }
+            });
+
+            if(!html) html = "Geen inhoudelijke wijzigingen (of volledige create/delete).";
+            
+            container.innerHTML = html;
+
+            // Restore knop alleen tonen bij UPDATE acties
+            if(log.change_type === 'UPDATE') {
+                btn.classList.remove('d-none');
+            } else {
+                btn.classList.add('d-none');
+            }
+
+            new bootstrap.Modal(document.getElementById('auditModal')).show();
+        }
+
+        async function restoreState() {
+            if(!confirm("Weet je zeker dat je de asset wilt terugzetten naar de status VOOR deze wijziging?")) return;
+            
+            const res = await fetch('/api/audit', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ action: 'restore', id: selectedLogId })
+            });
+
+            if(res.ok) {
+                alert(t('alert_restored'));
+                bootstrap.Modal.getInstance(document.getElementById('auditModal')).hide();
+                loadAuditLog(1);
+            } else {
+                alert(t('alert_error') + " " + await res.text());
+            }
+        }
+
+        function renderPagination(meta) {
+            const nav = document.getElementById('paginationControls'); nav.innerHTML = '';
+            if(meta.pages <= 1) return;
+            // Simpele prev/next logic
+            if(meta.page > 1) nav.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="loadAuditLog(${meta.page - 1})">Vorige</a></li>`;
+            nav.innerHTML += `<li class="page-item disabled"><span class="page-link">${meta.page} / ${meta.pages}</span></li>`;
+            if(meta.page < meta.pages) nav.innerHTML += `<li class="page-item"><a class="page-link" href="#" onclick="loadAuditLog(${meta.page + 1})">Volgende</a></li>`;
+        }
+    </script>
+</body>
+</html>
