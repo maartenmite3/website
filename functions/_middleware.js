@@ -1,8 +1,17 @@
 export async function onRequest(context) {
   const url = new URL(context.request.url);
-  
-  // 1. Deze paden mag iedereen zien (anders kom je nooit binnen)
-  if (url.pathname === '/login.html' || url.pathname.startsWith('/api/')) {
+  const path = url.pathname;
+
+  // 1. UITZONDERINGEN: Deze paden mag IEDEREEN zien.
+  // We checken nu op '/login', '/login.html' en alles wat start met '/api/'
+  // Ook slaan we bestanden over die een punt bevatten (zoals style.css, favicon.ico), 
+  // zodat de browser niet vastloopt op plaatjes.
+  if (
+    path === '/login' || 
+    path === '/login.html' || 
+    path.startsWith('/api/') ||
+    path.includes('.') // Negeer bestanden met extensies (plaatjes, css, etc)
+  ) {
     return context.next();
   }
 
@@ -16,14 +25,22 @@ export async function onRequest(context) {
   }
 
   // 3. Check in database of sessie geldig is
-  const session = await context.env.MY_DB.prepare('SELECT * FROM sessions WHERE id = ?').bind(sessionKey).first();
+  // We gebruiken hier user_id selectie om database data te sparen
+  const session = await context.env.MY_DB.prepare('SELECT user_id FROM sessions WHERE id = ?').bind(sessionKey).first();
   
   if (!session) {
-    // Ongeldige sessie? Redirect naar login
-    return Response.redirect(`${url.origin}/login.html`, 302);
+    // Wel een cookie, maar sessie niet gevonden in DB? (Bijv. verlopen) -> Redirect
+    // We verwijderen ook meteen de foute cookie voor de zekerheid
+    return new Response(null, {
+      status: 302,
+      headers: {
+        'Location': '/login.html',
+        'Set-Cookie': 'session_id=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT' 
+      }
+    });
   }
 
-  // 4. Alles oké? Sla user info op voor later en ga door
+  // 4. Alles oké? Haal user op
   context.data.user = await context.env.MY_DB.prepare('SELECT * FROM users WHERE id = ?').bind(session.user_id).first();
   return context.next();
 }
