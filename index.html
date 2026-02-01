@@ -2,246 +2,219 @@
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
+    <title>Dashboard - Security Center</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-light">
 
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
-            <a class="navbar-brand" href="#">Mijn Project</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item"><a class="nav-link active" href="#">Home</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/assets.html">Asset Inventory</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#">Placeholder 2</a></li>
-                </ul>
-                <div class="d-flex align-items-center gap-3">
-                    <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#settingsModal">
-                        <i class="bi bi-gear-fill"></i> Settings
-                    </button>
-                    <a id="adminBtn" href="/admin.html" class="btn btn-danger btn-sm d-none">Admin Panel</a>
-                    <a href="/api/logout" class="btn btn-danger btn-sm">Uitloggen</a>
-                </div>
+            <a class="navbar-brand" href="#"><i class="bi bi-shield-lock"></i> Security Center</a>
+            <div class="d-flex gap-3 align-items-center">
+                <a class="nav-link text-white" href="/assets.html">Assets</a>
+                <a class="nav-link text-white" href="/subscriptions.html">Subscripties</a>
+                <a id="adminBtn" href="/admin.html" class="btn btn-danger btn-sm d-none">Admin</a>
+                <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#settingsModal"><i class="bi bi-gear-fill"></i></button>
+                <a href="/api/logout" class="btn btn-danger btn-sm">Uit</a>
             </div>
         </div>
     </nav>
 
-    <div class="container mt-5">
-        <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white">
-                Dashboard Overzicht
+    <div class="container mt-4">
+        
+        <div class="row mb-4">
+            <div class="col-12">
+                <h2 class="display-6">Security Dashboard</h2>
+                <p class="text-muted">Welkom terug, <span id="username" class="fw-bold">...</span>. Hier is de status van vandaag.</p>
             </div>
-            <div class="card-body">
-                <h1 class="display-6">Welkom terug, <span id="username" class="fw-bold">...</span>!</h1>
-                <p class="lead">Je bent succesvol ingelogd in de beveiligde omgeving.</p>
-                <hr>
-                <div class="alert alert-info">
-                    <i class="bi bi-info-circle"></i> Dit is een beveiligde indexpagina. Sessies verlopen automatisch na 15 minuten inactiviteit.
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card shadow-sm border-start border-4 border-primary h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted text-uppercase small">Totaal Assets</h6>
+                        <h2 class="display-4 fw-bold text-primary" id="kpiTotal">-</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm border-start border-4 border-success h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted text-uppercase small">Avg CIS Score</h6>
+                        <h2 class="display-4 fw-bold text-success" id="kpiCis">-</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm border-start border-4 border-danger h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted text-uppercase small">Critical Issues</h6>
+                        <h2 class="display-4 fw-bold text-danger" id="kpiCrit">-</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm border-start border-4 border-warning h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted text-uppercase small">High Issues</h6>
+                        <h2 class="display-4 fw-bold text-warning" id="kpiHigh">-</h2>
+                    </div>
                 </div>
             </div>
         </div>
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white">Data Classificatie Verdeling</div>
+                    <div class="card-body">
+                        <canvas id="classChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white">Kwetsbaarheden per Severity</div>
+                    <div class="card-body">
+                        <canvas id="vulnChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <div class="modal fade" id="settingsModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Mijn Instellingen</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
+                <div class="modal-header"><h5 class="modal-title">Instellingen</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body">
-                    
-                    <h6><i class="bi bi-key"></i> Wachtwoord Wijzigen</h6>
-                    <div class="input-group mb-3 mt-2">
-                        <input type="password" id="newPass" class="form-control" placeholder="Nieuw wachtwoord">
-                        <button class="btn btn-outline-secondary" type="button" onclick="updatePass()">Opslaan</button>
-                    </div>
-
+                    <h6>Wachtwoord Wijzigen</h6>
+                    <div class="input-group mb-3"><input type="password" id="newPass" class="form-control" placeholder="Nieuw wachtwoord"><button class="btn btn-secondary" onclick="updatePass()">Opslaan</button></div>
                     <hr>
-
-                    <h6><i class="bi bi-shield-lock"></i> Multi-Factor Authenticatie</h6>
-                    <p class="small text-muted mb-2">Status: <span id="mfaStatus" class="badge bg-secondary">Laden...</span></p>
-
-                    <div id="mfaControls">
-                        <button id="startMfaBtn" class="btn btn-outline-primary btn-sm w-100 d-none" onclick="startMfaSetup()">
-                            MFA Configureren
-                        </button>
-                        
-                        <button id="disableMfaBtn" class="btn btn-outline-danger btn-sm w-100 d-none" onclick="disableMFA()">
-                            MFA Uitschakelen
-                        </button>
+                    <h6>MFA Status: <span id="mfaStatus" class="badge bg-secondary">...</span></h6>
+                    <div id="mfaControls" class="mt-2">
+                        <button id="startMfaBtn" class="btn btn-primary btn-sm w-100 d-none" onclick="startMfaSetup()">MFA Aanzetten</button>
+                        <button id="disableMfaBtn" class="btn btn-danger btn-sm w-100 d-none" onclick="disableMFA()">MFA Uitschakelen</button>
                     </div>
-
-                    <div id="mfaSetup" class="d-none border p-3 rounded bg-light mt-2">
-                        <p class="small fw-bold">Scan met Google Authenticator:</p>
-                        <div id="qrcode" class="mb-3 d-flex justify-content-center bg-white p-2 border"></div>
-                        
-                        <label class="small form-label">Vul de code in die je ziet:</label>
-                        <div class="input-group mb-2">
-                            <input type="text" id="setupCode" class="form-control" placeholder="123456" maxlength="6" inputmode="numeric">
-                            <button class="btn btn-success" onclick="confirmMFA()">Activeren</button>
-                        </div>
-                        
+                    <div id="mfaSetup" class="d-none border p-3 mt-2">
+                        <div id="qrcode" class="mb-2"></div>
+                        <input type="text" id="setupCode" class="form-control mb-2" placeholder="Code"><button class="btn btn-success w-100" onclick="confirmMFA()">Bevestigen</button>
                         <input type="hidden" id="tempSecret">
-                        
-                        <div class="text-center">
-                            <button class="btn btn-sm btn-link text-muted" onclick="cancelSetup()">Annuleren</button>
-                        </div>
                     </div>
-
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Sluiten</button>
                 </div>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script>
-        // --- 1. GEGEVENS LADEN ---
-        // Haalt gebruikersnaam en MFA status op bij het laden van de pagina
-// --- 1. GEGEVENS LADEN ---
-fetch('/api/user')
-    .then(r => r.json())
-    .then(user => {
-        document.getElementById('username').innerText = user.username;
-        updateMfaUI(user.mfa_enabled);
+        // 1. DATA LADEN
+        fetch('/api/user').then(r => {
+            if(r.status===401) window.location.href='/login.html';
+            return r.json();
+        }).then(u => {
+            document.getElementById('username').innerText = u.username;
+            if(u.role === 'admin') document.getElementById('adminBtn').classList.remove('d-none');
+            updateMfaUI(u.mfa_enabled);
+            loadDashboardStats();
+        });
 
-        // NIEUW: Check of user admin is
-        if (user.role === 'admin') {
-            const btn = document.getElementById('adminBtn');
-            btn.classList.remove('d-none'); // Maak knop zichtbaar
-        }
-    })
-    // ... rest van de code
-        // Functie om de juiste knoppen te tonen (Aan of Uit)
-        function updateMfaUI(isEnabled) {
-            const badge = document.getElementById('mfaStatus');
-            const startBtn = document.getElementById('startMfaBtn');
-            const disableBtn = document.getElementById('disableMfaBtn');
-            const setupBox = document.getElementById('mfaSetup');
-            const controlsBox = document.getElementById('mfaControls');
+        async function loadDashboardStats() {
+            try {
+                const res = await fetch('/api/dashboard-stats');
+                const stats = await res.json();
 
-            // Reset alles naar basis
-            startBtn.classList.add('d-none');
-            disableBtn.classList.add('d-none');
-            setupBox.classList.add('d-none');
-            controlsBox.classList.remove('d-none'); // Knoppen weer zichtbaar maken
+                // Vul KPI kaarten
+                document.getElementById('kpiTotal').innerText = stats.total_assets;
+                document.getElementById('kpiCis').innerText = stats.avg_cis + '%';
 
-            if (isEnabled) {
-                badge.innerText = "Actief";
-                badge.className = "badge bg-success";
-                disableBtn.classList.remove('d-none'); // Toon "Uitschakelen"
-            } else {
-                badge.innerText = "Niet actief";
-                badge.className = "badge bg-warning text-dark";
-                startBtn.classList.remove('d-none'); // Toon "Configureren"
-            }
+                const crit = stats.vuln_stats.find(v => v.severity === 'Critical');
+                document.getElementById('kpiCrit').innerText = crit ? crit.count : 0;
+
+                const high = stats.vuln_stats.find(v => v.severity === 'High');
+                document.getElementById('kpiHigh').innerText = high ? high.count : 0;
+
+                // Render Grafieken
+                renderClassChart(stats.classification_stats);
+                renderVulnChart(stats.vuln_stats);
+
+            } catch(e) { console.error("Stats fout", e); }
         }
 
-        // --- 2. WACHTWOORD UPDATEN ---
-        async function updatePass() {
-            const passField = document.getElementById('newPass');
-            const newPass = passField.value;
+        function renderClassChart(data) {
+            const ctx = document.getElementById('classChart').getContext('2d');
+            const labels = data.map(d => d.classification);
+            const counts = data.map(d => d.count);
             
-            if(!newPass) { alert("Vul wel iets in!"); return; }
+            // Kleuren mapping
+            const colors = labels.map(l => {
+                if(l==='Confidential') return '#dc3545';
+                if(l==='Internal') return '#ffc107';
+                return '#198754';
+            });
 
-            try {
-                const res = await fetch('/api/user', { 
-                    method: 'PUT', 
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ new_password: newPass }) 
-                });
-
-                if (res.ok) {
-                    alert('Wachtwoord succesvol gewijzigd!');
-                    passField.value = '';
-                } else {
-                    const txt = await res.text();
-                    alert('Fout: ' + txt);
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{ data: counts, backgroundColor: colors }]
                 }
-            } catch (e) { alert('Verbindingsfout bij wachtwoord wijzigen.'); }
+            });
         }
 
-        // --- 3. MFA SETUP STARTEN ---
+        function renderVulnChart(data) {
+            const ctx = document.getElementById('vulnChart').getContext('2d');
+            // Zorg voor vaste volgorde
+            const order = ['Critical', 'High', 'Medium', 'Low'];
+            const counts = order.map(sev => {
+                const found = data.find(d => d.severity === sev);
+                return found ? found.count : 0;
+            });
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: order,
+                    datasets: [{ 
+                        label: 'Aantal',
+                        data: counts, 
+                        backgroundColor: ['#dc3545', '#fd7e14', '#ffc107', '#0d6efd'] 
+                    }]
+                },
+                options: { scales: { y: { beginAtZero: true } } }
+            });
+        }
+
+        // --- MFA & SETTINGS FUNCTIES (zelfde als voorheen) ---
+        function updateMfaUI(isOn) {
+            document.getElementById('mfaStatus').innerText = isOn ? "Actief" : "Uit";
+            document.getElementById('mfaStatus').className = isOn ? "badge bg-success" : "badge bg-warning text-dark";
+            if(isOn) document.getElementById('disableMfaBtn').classList.remove('d-none');
+            else document.getElementById('startMfaBtn').classList.remove('d-none');
+        }
+        async function updatePass() {
+            const p = document.getElementById('newPass').value; if(!p) return;
+            await fetch('/api/user', {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({new_password:p})});
+            alert('Opgeslagen'); document.getElementById('newPass').value='';
+        }
         async function startMfaSetup() {
-            try {
-                // Haal secret en URL op van backend
-                const res = await fetch('/api/mfa-settings');
-                const data = await res.json();
-                
-                // UI Wisselen: Knoppen weg, Setup box tonen
-                document.getElementById('mfaControls').classList.add('d-none');
-                document.getElementById('mfaSetup').classList.remove('d-none');
-                
-                // Secret opslaan in hidden field
-                document.getElementById('tempSecret').value = data.secret;
-                
-                // QR Code renderen
-                document.getElementById('qrcode').innerHTML = "";
-                new QRCode(document.getElementById("qrcode"), {
-                    text: data.otpauth_url,
-                    width: 128,
-                    height: 128
-                });
-            } catch (e) {
-                console.error(e);
-                alert("Kon MFA setup niet starten.");
-            }
+            const r = await fetch('/api/mfa-settings'); const d = await r.json();
+            document.getElementById('mfaSetup').classList.remove('d-none'); document.getElementById('mfaControls').classList.add('d-none');
+            document.getElementById('tempSecret').value = d.secret; document.getElementById('qrcode').innerHTML="";
+            new QRCode(document.getElementById("qrcode"), {text:d.otpauth_url, width:128, height:128});
         }
-
-        function cancelSetup() {
-            // UI terugzetten: Setup box weg, Knoppen terug
-            document.getElementById('mfaSetup').classList.add('d-none');
-            document.getElementById('mfaControls').classList.remove('d-none');
-        }
-
-        // --- 4. MFA BEVESTIGEN (ACTIVEREN) ---
         async function confirmMFA() {
-            const secret = document.getElementById('tempSecret').value;
-            const token = document.getElementById('setupCode').value;
-
-            if(!token) { alert("Vul de code in!"); return; }
-
-            try {
-                const res = await fetch('/api/mfa-settings', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ secret, token })
-                });
-
-                if (res.ok) {
-                    alert('Succes! MFA is nu ingeschakeld.');
-                    location.reload(); // Herlaad om de nieuwe status te zien
-                } else {
-                    alert('Code onjuist, probeer het opnieuw.');
-                }
-            } catch (e) { alert('Verbindingsfout.'); }
+            const r = await fetch('/api/mfa-settings', {method:'POST', body:JSON.stringify({secret:document.getElementById('tempSecret').value, token:document.getElementById('setupCode').value})});
+            if(r.ok) location.reload(); else alert('Fout');
         }
-
-        // --- 5. MFA UITSCHAKELEN (DELETE) ---
         async function disableMFA() {
-            if(!confirm("Weet je zeker dat je 2FA wilt uitzetten? Je account is dan minder goed beveiligd.")) return;
-
-            try {
-                const res = await fetch('/api/mfa-settings', { method: 'DELETE' });
-                
-                if (res.ok) {
-                    alert('MFA is uitgeschakeld.');
-                    location.reload(); // Herlaad om de knoppen te resetten
-                } else {
-                    alert('Kon MFA niet uitschakelen.');
-                }
-            } catch (e) { alert('Verbindingsfout.'); }
+            if(confirm('Zeker weten?')) { await fetch('/api/mfa-settings', {method:'DELETE'}); location.reload(); }
         }
     </script>
 </body>

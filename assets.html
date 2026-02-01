@@ -31,22 +31,16 @@
         <div class="d-flex justify-content-between mb-3 align-items-center">
             <div>
                 <button class="btn btn-primary" onclick="openCreateModal()"><i class="bi bi-plus-lg"></i> Nieuwe Asset</button>
-                <button class="btn btn-success ms-2" onclick="openImportModal()"><i class="bi bi-file-earmark-spreadsheet"></i> Import CSV</button>
+                <button class="btn btn-success ms-2" onclick="openImportModal()"><i class="bi bi-file-earmark-spreadsheet"></i> Import</button>
+                <button class="btn btn-outline-dark ms-2" onclick="exportCSV()"><i class="bi bi-download"></i> Export</button>
             </div>
             
             <div class="d-flex gap-2 align-items-center">
                 <select id="limitSelect" class="form-select" style="width:auto;" onchange="changeLimit()">
-                    <option value="25">25</option>
-                    <option value="50">50</option>
-                    <option value="100">100</option>
-                    <option value="200">200</option>
-                    <option value="all">Alles</option>
+                    <option value="25">25</option><option value="50">50</option><option value="100">100</option><option value="all">Alles</option>
                 </select>
-
-                <button class="btn btn-outline-secondary" onclick="toggleGlobalReveal()" id="globalEyeBtn" title="Toon/Verberg alle gevoelige data">
-                    <i class="bi bi-eye"></i>
-                </button>
-                <input type="text" id="searchBar" class="form-control" placeholder="Zoek op alles..." oninput="handleSearch()">
+                <button class="btn btn-outline-secondary" onclick="toggleGlobalReveal()" id="globalEyeBtn" title="Toon/Verberg alle gevoelige data"><i class="bi bi-eye"></i></button>
+                <input type="text" id="searchBar" class="form-control" placeholder="Zoeken..." oninput="handleSearch()">
             </div>
         </div>
 
@@ -54,17 +48,7 @@
             <div class="card-body p-0">
                 <table class="table table-hover mb-0 align-middle text-nowrap">
                     <thead class="table-light">
-                        <tr>
-                            <th>Asset</th>
-                            <th>IP Adres(sen)</th>
-                            <th>Subscriptie</th>
-                            <th>Eigenaar</th>
-                            <th>Labels</th>
-                            <th>CIS</th>
-                            <th>Vulns</th>
-                            <th>Class</th>
-                            <th class="text-end">Actie</th>
-                        </tr>
+                        <tr><th>Asset</th><th>IPs</th><th>Subscriptie</th><th>Eigenaar</th><th>Labels</th><th>CIS</th><th>Vulns</th><th>Class</th><th class="text-end">Actie</th></tr>
                     </thead>
                     <tbody id="assetTable"><tr><td colspan="9" class="p-4 text-center">Laden...</td></tr></tbody>
                 </table>
@@ -75,10 +59,7 @@
     <div class="modal fade" id="assetModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title" id="modalTitle">Asset</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
+                <div class="modal-header bg-primary text-white"><h5 class="modal-title" id="modalTitle">Asset</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body">
                     <form id="assetForm">
                         <input type="hidden" id="assetId">
@@ -86,19 +67,9 @@
                             <div class="col-md-6"><label>Naam</label><input type="text" id="name" class="form-control" required></div>
                             <div class="col-md-3"><label>Type</label><select id="type" class="form-select"><option>Virtual Machine</option><option>SQL Database</option><option>App Service</option><option>Firewall</option><option>Network Interface</option></select></div>
                             <div class="col-md-3"><label>CIS Score</label><input type="number" id="cis" class="form-control" placeholder="0-100"></div>
-                            
                             <div class="col-md-6"><label>Subscriptie</label><select id="subSelect" class="form-select"></select></div>
                             <div class="col-md-6"><label class="text-danger">Eigenaar</label><input type="text" id="owner" class="form-control"></div>
-                            
-                            <div class="col-md-12">
-                                <label class="text-danger">IP Adres(sen)</label>
-                                <div class="input-group">
-                                    <span class="input-group-text"><i class="bi bi-hdd-network"></i></span>
-                                    <input type="text" id="ip" class="form-control" placeholder="10.0.0.1, 192.168.1.5">
-                                </div>
-                                <div class="form-text">Meerdere IP's scheiden met een komma.</div>
-                            </div>
-
+                            <div class="col-md-12"><label class="text-danger">IP Adres(sen)</label><input type="text" id="ip" class="form-control" placeholder="10.0.0.1, 192.168.1.5"></div>
                             <div class="col-md-6"><label>Classificatie</label><select id="classif" class="form-select"><option>Public</option><option>Internal</option><option>Confidential</option></select></div>
                             <div class="col-md-6">
                                 <label>Data Gevoeligheid</label>
@@ -111,10 +82,7 @@
                         </div>
                     </form>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuleren</button>
-                    <button type="button" class="btn btn-success" onclick="saveAsset()">Opslaan</button>
-                </div>
+                <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Annuleren</button><button class="btn btn-success" onclick="saveAsset()">Opslaan</button></div>
             </div>
         </div>
     </div>
@@ -126,7 +94,8 @@
                 <div class="modal-body p-0">
                     <ul class="nav nav-tabs nav-fill bg-light" role="tablist">
                         <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabVuln">🛑 Kwetsbaarheden</a></li>
-                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabCis">✅ CIS Uitzonderingen</a></li>
+                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabCis">✅ CIS</a></li>
+                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabRel">🔗 Relaties</a></li>
                         <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabHist">🕒 Geschiedenis</a></li>
                     </ul>
                     <div class="tab-content p-3">
@@ -134,12 +103,13 @@
                             <form id="vulnForm" class="row g-2 mb-3 bg-light p-2 border rounded">
                                 <div class="col-md-3"><input type="text" id="vName" class="form-control form-control-sm" placeholder="Kwetsbaarheid"></div>
                                 <div class="col-md-2"><select id="vSev" class="form-select form-select-sm"><option>Critical</option><option>High</option><option>Medium</option></select></div>
-                                <div class="col-md-3"><select id="vStat" class="form-select form-select-sm"><option>Open</option><option>Tijdelijke Uitzondering</option><option>Permanente Uitzondering</option></select></div>
+                                <div class="col-md-3"><select id="vStat" class="form-select form-select-sm"><option>Open</option><option>Tijdelijke Uitzondering</option></select></div>
                                 <div class="col-md-2"><input type="date" id="vDate" class="form-control form-control-sm"></div>
                                 <div class="col-md-2"><button type="button" onclick="addVuln()" class="btn btn-sm btn-success w-100">Toevoegen</button></div>
                             </form>
                             <table class="table table-sm table-striped"><thead><tr><th>Naam</th><th>Severity</th><th>Status</th><th>Einddatum</th><th>Actie</th></tr></thead><tbody id="vulnTable"></tbody></table>
                         </div>
+                        
                         <div class="tab-pane fade" id="tabCis">
                             <form id="cisForm" class="row g-2 mb-3 bg-light p-2 border rounded">
                                 <div class="col-md-2"><input type="text" id="cId" class="form-control form-control-sm" placeholder="ID"></div>
@@ -149,6 +119,31 @@
                             </form>
                             <table class="table table-sm table-striped"><thead><tr><th>ID</th><th>Omschrijving</th><th>Reden</th><th>Actie</th></tr></thead><tbody id="cisTable"></tbody></table>
                         </div>
+
+                        <div class="tab-pane fade" id="tabRel">
+                            <div class="alert alert-info py-2 small">Definieer afhankelijkheden. Bijv: "Deze asset draait op..."</div>
+                            <form id="relForm" class="row g-2 mb-3 bg-light p-2 border rounded align-items-center">
+                                <div class="col-auto">Deze asset</div>
+                                <div class="col-md-3">
+                                    <select id="rType" class="form-select form-select-sm">
+                                        <option value="Draait op">Draait op</option>
+                                        <option value="Verbonden met">Verbonden met</option>
+                                        <option value="Afhankelijk van">Afhankelijk van</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <select id="rTarget" class="form-select form-select-sm"><option>Laden...</option></select>
+                                </div>
+                                <div class="col-md-2"><button type="button" onclick="addRel()" class="btn btn-sm btn-success w-100">Koppelen</button></div>
+                            </form>
+                            
+                            <h6>Afhankelijkheden (Downstream)</h6>
+                            <table class="table table-sm table-bordered mb-3"><tbody id="relDownTable"></tbody></table>
+                            
+                            <h6>Wordt gebruikt door (Upstream)</h6>
+                            <table class="table table-sm table-bordered"><tbody id="relUpTable"></tbody></table>
+                        </div>
+
                         <div class="tab-pane fade" id="tabHist"><table class="table table-sm text-muted small"><thead><tr><th>Tijd</th><th>Wie</th><th>Type</th></tr></thead><tbody id="histTable"></tbody></table></div>
                     </div>
                 </div>
@@ -159,23 +154,14 @@
     <div class="modal fade" id="importModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title">Assets Importeren</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-header"><h5 class="modal-title">Importeren</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">Selecteer <code>resources.csv</code></label>
-                        <input type="file" id="csvFile" class="form-control" accept=".csv">
-                    </div>
+                    <input type="file" id="csvFile" class="form-control mb-3" accept=".csv">
                     <button class="btn btn-primary mb-3" onclick="analyzeCSV()">Analyseren</button>
                     <div id="importPreview" class="d-none">
-                        <ul class="nav nav-tabs" id="importTabs">
-                            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabNew">Nieuw (<span id="countNew">0</span>)</a></li>
-                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabConf">Conflicten (<span id="countConf">0</span>)</a></li>
-                        </ul>
-                        <div class="tab-content border p-2 mb-3" style="max-height: 200px; overflow-y: auto;">
-                            <div class="tab-pane fade show active" id="tabNew"><table class="table table-sm text-success"><tbody id="listNew"></tbody></table></div>
-                            <div class="tab-pane fade" id="tabConf"><table class="table table-sm text-danger"><tbody id="listConf"></tbody></table></div>
-                        </div>
-                        <button class="btn btn-success w-100" id="btnConfirmImport" onclick="executeImport()" disabled>Importeren Starten</button>
+                        <ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" href="#">Nieuw (<span id="countNew">0</span>)</a></li></ul>
+                        <div class="border p-2 mb-3" style="max-height:200px;overflow-y:auto"><table class="table table-sm"><tbody id="listNew"></tbody></table></div>
+                        <button class="btn btn-success w-100" id="btnConfirmImport" onclick="executeImport()" disabled>Start Import</button>
                     </div>
                 </div>
             </div>
@@ -184,31 +170,82 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        let allAssets = [];
-        let allSubs = [];
-        let currentAssetId = null;
-        let isGlobalRevealed = false;
-        let importData = { new: [] };
-        let searchTimeout = null; // Voor debounce
+        let allAssets = []; let allSubs = []; let currentAssetId = null;
+        let isGlobalRevealed = false; let importData = { new: [] }; let searchTimeout = null;
 
-        // START
+        // INIT
         loadSubs();
 
+        // 1. EXPORT FUNCTIE
+        async function exportCSV() {
+            // Haal ALLES op voor export (limit=all)
+            const res = await fetch('/api/assets?limit=all');
+            if(!res.ok) return alert('Fout bij ophalen data');
+            const data = await res.json();
+            
+            if (data.length === 0) return alert("Geen data.");
+
+            const headers = ["ID", "Naam", "Type", "IP Adressen", "Subscriptie", "Eigenaar", "CIS Score", "Classificatie", "Gevoeligheid", "Vuln Count"];
+            let csv = headers.join(",") + "\n";
+
+            data.forEach(a => {
+                const subObj = allSubs.find(s => s.guid === a.subscription_id);
+                const subName = subObj ? subObj.name : a.subscription_id;
+                const ips = (a.ips && a.ips.length > 0) ? a.ips.join(";") : a.ip_address;
+                const row = [
+                    a.id, `"${a.name}"`, `"${a.type}"`, `"${ips}"`, `"${subName}"`, `"${a.owner_contact}"`,
+                    a.cis_score||0, a.classification, `"${(a.data_sensitivity||'').replace(/,/g,';')}"`, a.vuln_count
+                ];
+                csv += row.join(",") + "\n";
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `assets_export_${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
+
+        // 2. RELATIE FUNCTIES
+        async function loadAssetDropdown() {
+            const res = await fetch('/api/asset-details?type=list');
+            const list = await res.json();
+            const sel = document.getElementById('rTarget');
+            sel.innerHTML = '';
+            list.forEach(item => {
+                if(item.id !== currentAssetId) sel.innerHTML += `<option value="${item.id}">${item.name}</option>`;
+            });
+        }
+
+        async function addRel() {
+            const targetId = document.getElementById('rTarget').value;
+            const type = document.getElementById('rType').value;
+            await fetch('/api/asset-details', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ type: 'rel', parent_id: currentAssetId, child_id: targetId, relation_type: type }) 
+            });
+            // Reload details
+            const name = document.getElementById('detailTitle').innerText.replace('Details voor: ', '');
+            openDetailModal(currentAssetId, name);
+        }
+
+        async function deleteDetail(type, id) {
+            if(!confirm("Verwijderen?")) return;
+            await fetch('/api/asset-details', { method: 'DELETE', body: JSON.stringify({type, id}) });
+            const name = document.getElementById('detailTitle').innerText.replace('Details voor: ', '');
+            openDetailModal(currentAssetId, name);
+            if(type !== 'rel') loadAssets(); // Update counts in main table
+        }
+
+        // --- CORE LOADERS ---
         function toggleGlobalReveal() {
             isGlobalRevealed = !isGlobalRevealed;
             const btn = document.getElementById('globalEyeBtn');
             const icon = btn.querySelector('i');
-            if (isGlobalRevealed) {
-                btn.classList.replace('btn-outline-secondary', 'btn-warning');
-                icon.classList.replace('bi-eye', 'bi-eye-slash');
-            } else {
-                btn.classList.replace('btn-warning', 'btn-outline-secondary');
-                icon.classList.replace('bi-eye-slash', 'bi-eye');
-            }
-            document.querySelectorAll('.masked-data').forEach(el => {
-                if (isGlobalRevealed) el.classList.add('revealed');
-                else el.classList.remove('revealed');
-            });
+            if (isGlobalRevealed) { btn.className='btn btn-warning'; icon.className='bi bi-eye-slash'; }
+            else { btn.className='btn btn-outline-secondary'; icon.className='bi bi-eye'; }
+            document.querySelectorAll('.masked-data').forEach(el => el.classList.toggle('revealed', isGlobalRevealed));
         }
 
         async function loadSubs() {
@@ -217,177 +254,124 @@
                 allSubs = await res.json();
                 const sel = document.getElementById('subSelect');
                 sel.innerHTML = '<option value="">Kies...</option>';
-                allSubs.forEach(s => sel.innerHTML += `<option value="${s.guid}">${s.name} (${s.guid})</option>`);
-                loadAssets(); // Start laden
+                allSubs.forEach(s => sel.innerHTML += `<option value="${s.guid}">${s.name}</option>`);
+                loadAssets();
             }
         }
 
-        // AANGEPAST: Laad Assets nu via Server-Side Search/Limit
         async function loadAssets() {
             const limit = document.getElementById('limitSelect').value;
             const query = document.getElementById('searchBar').value;
+            let url = `/api/assets?limit=${limit}`; if(query) url += `&q=${encodeURIComponent(query)}`;
             
-            // Bouw URL met parameters
-            let url = `/api/assets?limit=${limit}`;
-            if(query) url += `&q=${encodeURIComponent(query)}`;
-
             const tbody = document.getElementById('assetTable');
             tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center">Laden...</td></tr>';
-
-            const res = await fetch(url);
-            if(res.status === 401) return window.location.href = '/login.html';
             
-            allAssets = await res.json(); // Dit is nu de beperkte set (bv. 25 items)
+            const res = await fetch(url);
+            if(res.status === 401) return window.location.href='/login.html';
+            allAssets = await res.json();
             renderTable(allAssets);
         }
 
-        // DEBOUNCE SEARCH: Wacht 300ms na typen voordat we server bellen
-        function handleSearch() {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                loadAssets();
-            }, 300);
-        }
-
-        function changeLimit() {
-            loadAssets();
-        }
+        function handleSearch() { clearTimeout(searchTimeout); searchTimeout = setTimeout(loadAssets, 300); }
+        function changeLimit() { loadAssets(); }
 
         function renderTable(data) {
-            const tbody = document.getElementById('assetTable');
-            tbody.innerHTML = '';
-            
-            if(data.length === 0) {
-                 tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-muted">Geen resultaten.</td></tr>';
-                 return;
-            }
+            const tbody = document.getElementById('assetTable'); tbody.innerHTML = '';
+            if(data.length===0) return tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center">Geen resultaten</td></tr>';
 
             data.forEach(a => {
-                let rowClass = 'public';
-                if(a.classification === 'Internal') rowClass = 'internal';
-                if(a.classification === 'Confidential') rowClass = 'confidential';
-
-                let cisColor = a.cis_score < 50 ? 'text-danger fw-bold' : (a.cis_score < 70 ? 'text-warning' : 'text-success');
-                let vulnBadge = a.vuln_count > 0 ? `<span class="badge bg-danger">${a.vuln_count}</span>` : `<span class="badge bg-success">0</span>`;
-                const labels = a.data_sensitivity ? a.data_sensitivity.split(',').map(l => `<span class="badge bg-secondary me-1">${l}</span>`).join('') : '-';
-                const revealedClass = isGlobalRevealed ? 'revealed' : '';
-
-                const subObj = allSubs.find(s => s.guid === a.subscription_id);
-                const subDisplay = subObj ? subObj.name : a.subscription_id;
-
-                const ips = a.ips || [];
-                const primaryIp = ips[0] || a.ip_address || '';
-                let ipDisplay = primaryIp;
-                if(ips.length > 1) {
-                    ipDisplay += ` <span class="badge bg-secondary rounded-pill" title="${ips.join(', ')}">+${ips.length - 1}</span>`;
-                }
+                let rCls = a.classification==='Confidential'?'confidential':(a.classification==='Internal'?'internal':'public');
+                let cisCls = a.cis_score<50?'text-danger fw-bold':(a.cis_score<70?'text-warning':'text-success');
+                let vBadge = a.vuln_count>0?`<span class="badge bg-danger">${a.vuln_count}</span>`:`<span class="badge bg-success">0</span>`;
+                const subObj = allSubs.find(s=>s.guid===a.subscription_id);
+                const subDisp = subObj?subObj.name:a.subscription_id;
+                const ips = a.ips||[]; const ipDisp = (ips[0]||a.ip_address||'') + (ips.length>1?` <span class="badge bg-secondary">+${ips.length-1}</span>`:'');
+                const rev = isGlobalRevealed?'revealed':'';
 
                 tbody.innerHTML += `
-                    <tr class="${rowClass}">
+                    <tr class="${rCls}">
                         <td><span class="clickable-asset" onclick="openDetailModal(${a.id}, '${a.name}')">${a.name}</span><br><small class="text-muted">${a.type}</small></td>
-                        <td><span class="masked-data ${revealedClass}" onclick="this.classList.toggle('revealed')">${ipDisplay}</span></td>
-                        <td><span class="masked-data ${revealedClass}" onclick="this.classList.toggle('revealed')">${subDisplay}</span></td>
-                        <td><span class="masked-data ${revealedClass}" onclick="this.classList.toggle('revealed')">${a.owner_contact}</span></td>
-                        <td>${labels}</td>
-                        <td class="${cisColor}">${a.cis_score || 0}%</td>
-                        <td>${vulnBadge}</td>
+                        <td><span class="masked-data ${rev}" onclick="this.classList.toggle('revealed')">${ipDisp}</span></td>
+                        <td><span class="masked-data ${rev}" onclick="this.classList.toggle('revealed')">${subDisp}</span></td>
+                        <td><span class="masked-data ${rev}" onclick="this.classList.toggle('revealed')">${a.owner_contact}</span></td>
+                        <td>${(a.data_sensitivity||'').split(',').map(l=>l?`<span class="badge bg-secondary me-1">${l}</span>`:'').join('')}</td>
+                        <td class="${cisCls}">${a.cis_score||0}%</td>
+                        <td>${vBadge}</td>
                         <td>${a.classification}</td>
                         <td class="text-end">
                             <button class="btn btn-sm btn-outline-primary" onclick="openEditModal(${a.id})"><i class="bi bi-pencil"></i></button>
                             <button class="btn btn-sm btn-outline-danger" onclick="deleteAsset(${a.id})"><i class="bi bi-trash"></i></button>
                         </td>
-                    </tr>
-                `;
+                    </tr>`;
             });
         }
 
-        // --- IMPORT ---
-        function openImportModal() { document.getElementById('importPreview').classList.add('d-none'); document.getElementById('csvFile').value = ''; new bootstrap.Modal(document.getElementById('importModal')).show(); }
-        function analyzeCSV() {
-            const file = document.getElementById('csvFile').files[0];
-            if(!file) return alert("Kies een bestand");
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const rows = csvToJSON(e.target.result);
-                if(rows.length === 0) { alert("Geen data."); return; }
-                try {
-                    const res = await fetch('/api/import-handler', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ mode: 'check', type: 'assets', data: rows }) });
-                    if(!res.ok) throw new Error(await res.text());
-                    const report = await res.json();
-                    importData.new = report.new;
-                    document.getElementById('countNew').innerText = report.new.length;
-                    document.getElementById('countConf').innerText = report.conflicts.length;
-                    document.getElementById('listNew').innerHTML = report.new.map(i => `<tr><td><i class="bi bi-plus-circle"></i> ${i.name}</td><td>${i.ip_address}</td></tr>`).join('');
-                    document.getElementById('listConf').innerHTML = report.conflicts.map(i => `<tr><td>${i.name}</td><td>${i.reason}</td></tr>`).join('');
-                    document.getElementById('importPreview').classList.remove('d-none');
-                    const btn = document.getElementById('btnConfirmImport'); btn.disabled = report.new.length === 0; btn.innerText = `Importeer ${report.new.length} Assets`;
-                } catch(err) { alert("Fout: " + err.message); }
-            };
-            reader.readAsText(file);
-        }
-        async function executeImport() {
-            if(!confirm(`Start import?`)) return;
-            const res = await fetch('/api/import-handler', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ mode: 'execute', type: 'assets', data: importData.new }) });
-            if(res.ok) { alert("Import klaar!"); bootstrap.Modal.getInstance(document.getElementById('importModal')).hide(); loadAssets(); } else alert("Fout bij opslaan.");
-        }
-        function csvToJSON(csv) {
-            const lines = csv.split(/\r?\n/); if(lines.length < 1) return [];
-            const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').replace(/^\uFEFF/, ''));
-            const result = [];
-            for(let i=1; i<lines.length; i++) { if(!lines[i].trim()) continue; const currentline = lines[i].split(','); const obj = {}; for(let j=0; j<headers.length; j++) { obj[headers[j]] = currentline[j] ? currentline[j].trim().replace(/^"|"$/g, '') : ''; } result.push(obj); }
-            return result;
-        }
-
-        // --- DETAILS ---
+        // --- DETAIL MODAL (Met Relaties) ---
         async function openDetailModal(id, name) {
-            currentAssetId = id; document.getElementById('detailTitle').innerText = `Details voor: ${name}`;
+            currentAssetId = id;
+            document.getElementById('detailTitle').innerText = `Details voor: ${name}`;
             try {
                 const res = await fetch(`/api/asset-details?id=${id}`);
-                if(res.headers.get("content-type") && res.headers.get("content-type").includes("text/html")) { alert("Fout: API niet gevonden."); return; }
                 const data = await res.json();
-                const vTable = document.getElementById('vulnTable'); vTable.innerHTML = ''; data.vulnerabilities.forEach(v => { vTable.innerHTML += `<tr><td>${v.name}</td><td>${v.severity}</td><td>${v.status}</td><td>${v.due_date||'-'}</td><td><i class="bi bi-trash text-danger" onclick="deleteDetail('vuln',${v.id})"></i></td></tr>`; });
-                const cTable = document.getElementById('cisTable'); cTable.innerHTML = ''; data.cis.forEach(c => { cTable.innerHTML += `<tr><td>${c.control_id}</td><td>${c.description}</td><td>${c.justification}</td><td><i class="bi bi-trash text-danger" onclick="deleteDetail('cis',${c.id})"></i></td></tr>`; });
-                const hTable = document.getElementById('histTable'); hTable.innerHTML = ''; data.history.forEach(h => { hTable.innerHTML += `<tr><td>${new Date(h.timestamp).toLocaleString()}</td><td>${h.changed_by}</td><td>${h.change_type}</td></tr>`; });
+                
+                // Vul Vulns
+                const vT = document.getElementById('vulnTable'); vT.innerHTML='';
+                data.vulnerabilities.forEach(v => vT.innerHTML+=`<tr><td>${v.name}</td><td>${v.severity}</td><td>${v.status}</td><td>${v.due_date||'-'}</td><td><i class="bi bi-trash text-danger" onclick="deleteDetail('vuln',${v.id})"></i></td></tr>`);
+                
+                // Vul CIS
+                const cT = document.getElementById('cisTable'); cT.innerHTML='';
+                data.cis.forEach(c => cT.innerHTML+=`<tr><td>${c.control_id}</td><td>${c.description}</td><td>${c.justification}</td><td><i class="bi bi-trash text-danger" onclick="deleteDetail('cis',${c.id})"></i></td></tr>`);
+                
+                // Vul Relaties
+                loadAssetDropdown(); // Vul de dropdown
+                const rdT = document.getElementById('relDownTable'); rdT.innerHTML = '';
+                data.relationships.downstream.forEach(r => rdT.innerHTML += `<tr><td>${r.relation_type} <span class="fw-bold">${r.name}</span></td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
+                
+                const ruT = document.getElementById('relUpTable'); ruT.innerHTML = '';
+                data.relationships.upstream.forEach(r => ruT.innerHTML += `<tr><td><span class="fw-bold">${r.name}</span> ${r.relation_type} deze asset</td><td class="text-end"><i class="bi bi-trash text-danger" onclick="deleteDetail('rel',${r.id})"></i></td></tr>`);
+
+                // Vul Hist
+                const hT = document.getElementById('histTable'); hT.innerHTML='';
+                data.history.forEach(h => hT.innerHTML+=`<tr><td>${new Date(h.timestamp).toLocaleString()}</td><td>${h.changed_by}</td><td>${h.change_type}</td></tr>`);
+                
                 new bootstrap.Modal(document.getElementById('detailModal')).show();
-            } catch (e) { console.error(e); alert("Details laden mislukt."); }
+            } catch(e) { console.error(e); alert("Details fout"); }
         }
+
         async function addVuln() { const body = { type: 'vuln', asset_id: currentAssetId, name: document.getElementById('vName').value, severity: document.getElementById('vSev').value, status: document.getElementById('vStat').value, due_date: document.getElementById('vDate').value }; await fetch('/api/asset-details', { method: 'POST', body: JSON.stringify(body) }); document.getElementById('vulnForm').reset(); openDetailModal(currentAssetId, document.getElementById('detailTitle').innerText.replace('Details voor: ', '')); loadAssets(); }
         async function addCis() { const body = { type: 'cis', asset_id: currentAssetId, control_id: document.getElementById('cId').value, description: document.getElementById('cDesc').value, justification: document.getElementById('cJust').value }; await fetch('/api/asset-details', { method: 'POST', body: JSON.stringify(body) }); document.getElementById('cisForm').reset(); openDetailModal(currentAssetId, document.getElementById('detailTitle').innerText.replace('Details voor: ', '')); }
-        async function deleteDetail(type, id) { if(!confirm("Verwijderen?")) return; await fetch('/api/asset-details', { method: 'DELETE', body: JSON.stringify({type, id}) }); openDetailModal(currentAssetId, document.getElementById('detailTitle').innerText.replace('Details voor: ', '')); loadAssets(); }
 
-        // --- ASSET MODAL ---
-        function openCreateModal() { document.getElementById('assetForm').reset(); document.getElementById('assetId').value = ''; document.getElementById('modalTitle').innerText = 'Nieuwe Asset'; new bootstrap.Modal(document.getElementById('assetModal')).show(); }
-        
+        // --- ASSET CRUD & IMPORT (Zelfde als voorheen) ---
+        function openCreateModal() { document.getElementById('assetForm').reset(); document.getElementById('assetId').value = ''; document.getElementById('modalTitle').innerText='Nieuwe Asset'; new bootstrap.Modal(document.getElementById('assetModal')).show(); }
         function openEditModal(id) {
-            // Let op: 'allAssets' bevat nu alleen de huidige pagina. Als je iets edit wat niet op de pagina staat (via search), werkt dit. 
-            // Maar 'edit' knop is alleen zichtbaar in de tabel, dus item zit in allAssets.
-            const asset = allAssets.find(a => a.id === id);
-            document.getElementById('assetId').value = id;
-            document.getElementById('name').value = asset.name;
-            document.getElementById('type').value = asset.type;
-            document.getElementById('cis').value = asset.cis_score;
-            document.getElementById('subSelect').value = asset.subscription_id; 
-            document.getElementById('owner').value = asset.owner_contact;
-            const ipList = asset.ips || [asset.ip_address];
-            document.getElementById('ip').value = ipList.join(', ');
-            document.getElementById('classif').value = asset.classification;
-            document.querySelectorAll('.sens-check').forEach(c => c.checked = (asset.data_sensitivity || '').includes(c.value));
-            document.getElementById('modalTitle').innerText = 'Asset Bewerken';
-            new bootstrap.Modal(document.getElementById('assetModal')).show();
+            const a = allAssets.find(x => x.id === id); document.getElementById('assetId').value=id; document.getElementById('name').value=a.name; document.getElementById('type').value=a.type; document.getElementById('cis').value=a.cis_score; document.getElementById('subSelect').value=a.subscription_id; document.getElementById('owner').value=a.owner_contact; document.getElementById('ip').value=(a.ips||[a.ip_address]).join(', '); document.getElementById('classif').value=a.classification; document.querySelectorAll('.sens-check').forEach(c => c.checked=(a.data_sensitivity||'').includes(c.value)); document.getElementById('modalTitle').innerText='Bewerken'; new bootstrap.Modal(document.getElementById('assetModal')).show();
         }
-
         async function saveAsset() {
-            const id = document.getElementById('assetId').value;
-            const sens = []; document.querySelectorAll('.sens-check:checked').forEach(c => sens.push(c.value));
-            const body = { id: id ? id : null, name: document.getElementById('name').value, type: document.getElementById('type').value, cis_score: document.getElementById('cis').value, subscription_id: document.getElementById('subSelect').value, owner_contact: document.getElementById('owner').value, ip_address: document.getElementById('ip').value, classification: document.getElementById('classif').value, data_sensitivity: sens };
-            const res = await fetch('/api/assets', { method: id ? 'PUT' : 'POST', body: JSON.stringify(body) });
-            if(res.ok) { bootstrap.Modal.getInstance(document.getElementById('assetModal')).hide(); loadAssets(); } else alert(await res.text());
+            const id = document.getElementById('assetId').value; const sens=[]; document.querySelectorAll('.sens-check:checked').forEach(c=>sens.push(c.value));
+            const body = { id:id?id:null, name:document.getElementById('name').value, type:document.getElementById('type').value, cis_score:document.getElementById('cis').value, subscription_id:document.getElementById('subSelect').value, owner_contact:document.getElementById('owner').value, ip_address:document.getElementById('ip').value, classification:document.getElementById('classif').value, data_sensitivity:sens };
+            const r = await fetch('/api/assets', {method:id?'PUT':'POST', body:JSON.stringify(body)});
+            if(r.ok) { bootstrap.Modal.getInstance(document.getElementById('assetModal')).hide(); loadAssets(); } else alert(await r.text());
         }
-
-        async function deleteAsset(id) { if(confirm("Verwijderen?")) { await fetch('/api/assets', { method: 'DELETE', body: JSON.stringify({id}) }); loadAssets(); } }
+        async function deleteAsset(id) { if(confirm('Wissen?')) { await fetch('/api/assets', {method:'DELETE', body:JSON.stringify({id})}); loadAssets(); } }
         
-        // OUDE Filter functie is WEG, nu via Server Search
-        // function filterTable() { ... } 
+        function openImportModal() { document.getElementById('importPreview').classList.add('d-none'); document.getElementById('csvFile').value=''; new bootstrap.Modal(document.getElementById('importModal')).show(); }
+        function analyzeCSV() {
+            const file = document.getElementById('csvFile').files[0]; if(!file) return alert('Kies bestand');
+            const reader = new FileReader(); reader.onload=async(e)=>{
+                const rows=csvToJSON(e.target.result); if(!rows.length) return alert('Geen data');
+                const r=await fetch('/api/import-handler', {method:'POST', body:JSON.stringify({mode:'check', type:'assets', data:rows})});
+                const d=await r.json(); importData.new=d.new;
+                document.getElementById('countNew').innerText=d.new.length; document.getElementById('listNew').innerHTML=d.new.map(i=>`<tr><td>${i.name}</td></tr>`).join('');
+                document.getElementById('importPreview').classList.remove('d-none'); document.getElementById('btnConfirmImport').disabled=!d.new.length;
+            }; reader.readAsText(file);
+        }
+        async function executeImport() {
+            if(!confirm('Start?')) return;
+            const r=await fetch('/api/import-handler', {method:'POST', body:JSON.stringify({mode:'execute', type:'assets', data:importData.new})});
+            if(r.ok) { alert('Klaar'); bootstrap.Modal.getInstance(document.getElementById('importModal')).hide(); loadAssets(); }
+        }
+        function csvToJSON(csv) { const lines=csv.split(/\r?\n/); if(lines.length<1) return []; const h=lines[0].split(',').map(x=>x.trim().replace(/^"|"$/g,'').replace(/^\uFEFF/,'')); const res=[]; for(let i=1;i<lines.length;i++){ if(!lines[i].trim()) continue; const l=lines[i].split(','); const o={}; for(let j=0;j<h.length;j++) o[h[j]]=l[j]?l[j].trim().replace(/^"|"$/g,''):''; res.push(o); } return res; }
     </script>
 </body>
 </html>
